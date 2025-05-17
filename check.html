@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <title>점심 식사 체크</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    body { font-family: 'Segoe UI', sans-serif; padding: 20px; background: #f2f2f2; text-align: center; }
+    h2 { margin-top: 0; font-size: 24px; color: #333; }
+    h3 { margin-top: 0; color: #222; }
+    .section { margin-top: 20px; }
+    .button { padding: 10px 20px; margin: 10px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; background-color: #2196F3; color: white; }
+    .button:hover { background-color: #1976D2; }
+    .ox-btn { padding: 6px 12px; margin-left: 8px; border-radius: 6px; border: none; font-size: 16px; background-color: #e0e0e0; cursor: pointer; }
+    .ox-btn.selected { background-color: #4caf50; color: white; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; justify-items: center; }
+    .name-btn { width: 100%; background-color: #fff; border: 1px solid #aaa; border-radius: 10px; padding: 10px; cursor: pointer; font-size: 15px; transition: background-color 0.2s ease; }
+    .name-btn:hover { background-color: #eee; }
+    .group-label { font-weight: bold; margin-top: 30px; font-size: 18px; color: #555; }
+    #dates { max-height: 70vh; overflow-y: auto; scroll-behavior: smooth; padding-bottom: 20px; }
+    #dates div { margin: 6px 0; font-size: 15px; }
+    .today-highlight { border: 2px solid #f44336; border-radius: 8px; padding: 4px; background-color: #ffecec; }
+  </style>
+</head>
+<body>
+  <h2>🍱 점심 식사 체크 - 오늘: <span id="todayDate"></span></h2>
+  <div id="main">
+    <div class="group-label">📌 일반직</div>
+    <div class="grid" id="regular"></div>
+    <div class="group-label">📌 기간제</div>
+    <div class="grid" id="contract"></div>
+  </div>
+  <div id="check" style="display:none">
+    <h3 id="selectedName"></h3>
+    <select id="monthSelect"></select>
+    <div id="dates"></div>
+    <button class="button" onclick="saveMealLog()">✅ 저장</button>
+    <button class="button" onclick="goBack()">⬅️ 뒤로</button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
+      authDomain: "lunch-20bb8.firebaseapp.com",
+      projectId: "lunch-20bb8",
+      storageBucket: "lunch-20bb8.appspot.com",
+      messagingSenderId: "218925939220",
+      appId: "1:218925939220:web:4b8940a954f05bfb4a0501"
+    };
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    const names = [
+      "이영일","김정이","이현승","김성동","김미지","박병삼","김하은","한수진","임정아",
+      "김혜경","심규한","연경순","임경순","이민하","이유미","이윤희","최승필","홍선주",
+      "석순옥","정미경","이창례","임주연","김문정","김미영","심장식","손영복","손영부",
+      "강성필","김정근","오화진"
+    ];
+
+    const today = new Date();
+    const thisYear = today.getFullYear();
+    const thisMonth = today.getMonth();
+    const todayISO = today.toISOString().split('T')[0];
+    document.getElementById('todayDate').textContent = todayISO;
+
+    let holidays = [];
+    function fetchHolidays(callback) {
+      db.ref("holidays").once("value").then(snapshot => {
+        holidays = snapshot.val() || [];
+        callback();
+      });
+    }
+
+    function isHoliday(dateStr) {
+      return holidays.includes(dateStr);
+    }
+
+    function generateWorkdaysForMonth(year, month) {
+      const dates = [];
+      const total = new Date(year, month + 1, 0).getDate();
+      const monthStr = String(month + 1).padStart(2, '0');
+      for (let d = 1; d <= total; d++) {
+        const date = new Date(year, month, d);
+        const dow = date.getDay();
+        const iso = `${year}-${monthStr}-${String(d).padStart(2, '0')}`;
+        if (dow >= 1 && dow <= 5 && !isHoliday(iso)) {
+          dates.push(iso);
+        }
+      }
+      return dates;
+    }
+
+    const regular = names.slice(0, 10);
+    const contract = names.slice(10);
+
+    regular.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'name-btn';
+      btn.textContent = name;
+      btn.onclick = () => openCheck(name);
+      document.getElementById('regular').appendChild(btn);
+    });
+    contract.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'name-btn';
+      btn.textContent = name;
+      btn.onclick = () => openCheck(name);
+      document.getElementById('contract').appendChild(btn);
+    });
+
+    let currentName = "";
+    let values = {};
+    let days = [];
+
+    function renderMonthOptions() {
+      const select = document.getElementById("monthSelect");
+      select.innerHTML = "";
+      for (let m = 0; m < 12; m++) {
+        const opt = document.createElement("option");
+        opt.value = m;
+        opt.textContent = `${m + 1}월`;
+        if (m === thisMonth) opt.selected = true;
+        select.appendChild(opt);
+      }
+      select.onchange = () => renderDates(currentName, parseInt(select.value));
+    }
+
+    function openCheck(name) {
+      currentName = name;
+      document.getElementById('main').style.display = 'none';
+      document.getElementById('check').style.display = 'block';
+      renderMonthOptions();
+      renderDates(name, thisMonth);
+    }
+
+    function renderDates(name, month) {
+      const year = thisYear;
+      document.getElementById('selectedName').textContent = `${name} - ${year}년 ${month + 1}월`;
+      const area = document.getElementById('dates');
+      area.innerHTML = "";
+      days = generateWorkdaysForMonth(year, month);
+      db.ref(`mealLogs/${name}`).once("value").then(snapshot => {
+        values = snapshot.val() || {};
+        let scrollTarget = null;
+        days.forEach(date => {
+          const row = document.createElement('div');
+          const label = document.createElement('span');
+          label.textContent = `${date}: `;
+          const oxO = document.createElement('button');
+          oxO.textContent = 'O';
+          oxO.className = 'ox-btn';
+          const oxX = document.createElement('button');
+          oxX.textContent = 'X';
+          oxX.className = 'ox-btn';
+
+          if (date === todayISO) row.classList.add("today-highlight");
+          if (date === todayISO) scrollTarget = row;
+
+          [oxO, oxX].forEach(btn => {
+            btn.onclick = () => {
+              values[date] = btn.textContent;
+              oxO.classList.toggle('selected', values[date] === 'O');
+              oxX.classList.toggle('selected', values[date] === 'X');
+            };
+          });
+
+          if (values[date] === 'O') oxO.classList.add('selected');
+          else if (values[date] === 'X') oxX.classList.add('selected');
+
+          row.appendChild(label);
+          row.appendChild(oxO);
+          row.appendChild(oxX);
+          area.appendChild(row);
+        });
+        if (scrollTarget) scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+
+    function goBack() {
+      document.getElementById('main').style.display = 'block';
+      document.getElementById('check').style.display = 'none';
+    }
+
+    function saveMealLog() {
+      db.ref(`mealLogs/${currentName}`).set(values).then(() => {
+        alert("저장되었습니다");
+        goBack();
+      });
+    }
+
+    fetchHolidays(() => {
+      // 시작 시 공휴일 반영 후 로딩
+    });
+  </script>
+</body>
+</html>
