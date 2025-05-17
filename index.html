@@ -39,36 +39,6 @@
     </table>
   </div>
 
-  <div id="expenses" style="display:none">
-    <h1>📋 식당운영비관리 <button onclick="exportTable('expenseBody', '식당운영비관리')">엑셀로 추출하기</button></h1>
-    <table>
-      <thead>
-        <tr><th>월</th><th>수입액</th><th>지출액</th><th>차액</th></tr>
-      </thead>
-      <tbody id="expenseBody"></tbody>
-    </table>
-    <div id="nextExpense"></div>
-  </div>
-
-  <div id="charges" style="display:none">
-    <h1>💰 식대 징수 
-      <select id="chargeMonthSelect">
-        <option value="2025-01">2025년 1월</option>
-        <option value="2025-02">2025년 2월</option>
-        <option value="2025-03">2025년 3월</option>
-        <option value="2025-04">2025년 4월</option>
-        <option value="2025-05" selected>2025년 5월</option>
-      </select>
-      <button onclick="exportTable('chargeBody', '식대징수')">엑셀로 추출하기</button>
-    </h1>
-    <table>
-      <thead>
-        <tr><th>이름</th><th>식사횟수</th><th>기본 식비</th><th>추가 식비</th><th>총액</th></tr>
-      </thead>
-      <tbody id="chargeBody"></tbody>
-    </table>
-  </div>
-
   <script>
     const firebaseConfig = {
       apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
@@ -80,35 +50,7 @@
       measurementId: "G-CH044PJTEL"
     };
     firebase.initializeApp(firebaseConfig);
-
     const db = firebase.database();
-
-    document.getElementById("btnStats").onclick = () => showSection("stats");
-    document.getElementById("btnExpenses").onclick = () => showSection("expenses");
-    document.getElementById("btnCharges").onclick = () => showSection("charges");
-
-    function showSection(id) {
-      ["stats", "expenses", "charges"].forEach(sec => {
-        document.getElementById(sec).style.display = (sec === id) ? "block" : "none";
-      });
-    }
-
-    function exportTable(tbodyId, filename) {
-      const table = document.createElement("table");
-      const thead = document.querySelector(`#${tbodyId}`).parentElement.querySelector("thead");
-      const cloneThead = thead.cloneNode(true);
-      const cloneTbody = document.getElementById(tbodyId).cloneNode(true);
-      table.appendChild(cloneThead);
-      table.appendChild(cloneTbody);
-      const html = table.outerHTML;
-      const blob = new Blob([html], { type: 'application/vnd.ms-excel' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `${filename}.xls`;
-      a.click();
-      URL.revokeObjectURL(url);
-    }
 
     const employees = [
       "이영일", "김정이", "이현승", "김성동", "김미지", "박병삼", "김하은", "한수진", "임정아",
@@ -138,95 +80,26 @@
         const statsHead = document.getElementById("statsHead");
         const statsBody = document.getElementById("statsBody");
 
-        statsHead.innerHTML = `<tr><th>날짜</th>${employees.map(name => `<th>${name}</th>`).join('')}<th>총 식사횟수</th></tr>`;
+        // 열 헤더: 날짜 목록 + 총합
+        statsHead.innerHTML = `<tr><th>이름</th>${days.map(d => `<th>${d.slice(5)}</th>`).join('')}<th>총 식사횟수</th></tr>`;
 
-        const rows = days.map(date => {
-          let count = 0;
-          const tds = employees.map(name => {
+        // 각 직원별 행 생성
+        const rows = employees.map(name => {
+          let total = 0;
+          const tds = days.map(date => {
             const val = mealData?.[name]?.[date] || '';
-            if (val === 'O') count++;
+            if (val === 'O') total++;
             return `<td>${val}</td>`;
           }).join('');
-          return `<tr><td>${date}</td>${tds}<td class="highlight">${count}</td></tr>`;
+          return `<tr><td>${name}</td>${tds}<td class="highlight">${total}</td></tr>`;
         });
 
         statsBody.innerHTML = rows.join('');
       });
     }
 
-    function renderChargeTable() {
-      const selected = document.getElementById("chargeMonthSelect").value;
-      const [year, monthStr] = selected.split("-");
-      const month = parseInt(monthStr, 10) - 1;
-
-      const days = [];
-      const totalDays = new Date(year, month + 1, 0).getDate();
-      for (let d = 1; d <= totalDays; d++) {
-        const date = new Date(year, month, d);
-        const iso = `${year}-${monthStr}-${String(d).padStart(2, '0')}`;
-        if (date.getDay() >= 1 && date.getDay() <= 5) {
-          days.push(iso);
-        }
-      }
-
-      db.ref("mealLogs").once("value").then(snapshot => {
-        const mealData = snapshot.val() || {};
-        const chargeBody = document.getElementById("chargeBody");
-        const rows = employees.map(name => {
-          const logs = mealData[name] || {};
-          const count = days.filter(date => logs[date] === 'O').length;
-          const base = 50000;
-          const extra = Math.max(0, count - 10) * 5000;
-          const total = base + extra;
-          return `<tr><td>${name}</td><td>${count}</td><td>${base.toLocaleString()}</td><td>${extra.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>`;
-        });
-        chargeBody.innerHTML = rows.join('');
-      });
-    }
-
     document.getElementById("monthSelect").addEventListener("change", renderStatsTable);
-    document.getElementById("chargeMonthSelect").addEventListener("change", renderChargeTable);
-
     renderStatsTable();
-    renderChargeTable();
-
-    // 식당운영비관리 탭 데이터 렌더링
-    const expenseBody = document.getElementById("expenseBody");
-    const nextExpense = document.getElementById("nextExpense");
-
-    const revenues = {
-      "1월": 265000,
-      "2월": 1170000,
-      "3월": 1170000,
-      "4월": 1905000
-    };
-    const expenses = {
-      "1월": 404650,
-      "2월": 1212510,
-      "3월": 1171310,
-      "4월": 1656100
-    };
-    const months = ["1월", "2월", "3월", "4월"];
-    const nextMonth = "5월";
-
-    const summerAverages = {
-      월: 8.57, 화: 17.36, 수: 17.51, 목: 18.61, 금: 15.73
-    };
-    const weekdayCount = { 월: 3, 화: 3, 수: 4, 목: 5, 금: 5 };
-    const unitCost = 4500;
-    let totalEstimate = 0;
-    for (const [day, avg] of Object.entries(summerAverages)) {
-      totalEstimate += avg * (weekdayCount[day] || 0) * unitCost;
-    }
-
-    expenseBody.innerHTML = months.map(m => {
-      const rev = revenues[m] || 0;
-      const exp = expenses[m] || 0;
-      const diff = rev - exp;
-      return `<tr><td>${m}</td><td>${rev.toLocaleString()}</td><td>${exp.toLocaleString()}</td><td>${diff.toLocaleString()}</td></tr>`;
-    }).join('');
-
-    nextExpense.innerHTML = `<h3>📌 ${nextMonth} 예상지출액: <span class="highlight">${Math.round(totalEstimate).toLocaleString()}원</span></h3>`;
   </script>
 </body>
 </html>
