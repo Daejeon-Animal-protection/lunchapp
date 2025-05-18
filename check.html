@@ -58,11 +58,34 @@
       "강성필","김정근","오화진"
     ];
 
+    const regular = names.slice(0, 10);
+    const contract = names.slice(10);
+
     const today = new Date();
+    today.setHours(today.getHours() + 9);
     const thisYear = today.getFullYear();
     const thisMonth = today.getMonth();
     const todayISO = today.toISOString().split('T')[0];
     document.getElementById('todayDate').textContent = todayISO;
+
+    const isMonday = today.getDay() === 1;
+    db.ref("mealLogs").once("value").then(snapshot => {
+      const allData = snapshot.val() || {};
+      let count = 0;
+      names.forEach((name) => {
+        if (isMonday && contract.includes(name)) return;
+        if (allData[name] && allData[name][todayISO] === 'O') count++;
+      });
+      const existing = document.getElementById('todayStat');
+      if (existing) existing.remove();
+      const stat = document.createElement('div');
+      stat.id = 'todayStat';
+      stat.style.marginTop = '10px';
+      stat.style.fontSize = '16px';
+      stat.style.color = '#333';
+      stat.textContent = `✅ 오늘 식사한 인원: ${count}명`;
+      document.getElementById('main').prepend(stat);
+    });
 
     let holidays = [];
     function fetchHolidays(callback) {
@@ -71,7 +94,6 @@
         callback();
       });
     }
-
     function isHoliday(dateStr) {
       return holidays.includes(dateStr);
     }
@@ -90,9 +112,6 @@
       }
       return dates;
     }
-
-    const regular = names.slice(0, 10);
-    const contract = names.slice(10);
 
     regular.forEach(name => {
       const btn = document.createElement('button');
@@ -142,6 +161,12 @@
       days = generateWorkdaysForMonth(year, month);
       db.ref(`mealLogs/${name}`).once("value").then(snapshot => {
         values = snapshot.val() || {};
+        const isContract = contract.includes(name);
+        days.forEach(date => {
+          const dow = new Date(date).getDay();
+          if (isContract && dow === 1) values[date] = 'X';
+        });
+
         let scrollTarget = null;
         days.forEach(date => {
           const row = document.createElement('div');
@@ -165,8 +190,14 @@
             };
           });
 
-          if (values[date] === 'O') oxO.classList.add('selected');
-          else if (values[date] === 'X') oxX.classList.add('selected');
+          oxO.classList.remove('selected');
+          oxX.classList.remove('selected');
+
+          if (values[date] === 'O') {
+            oxO.classList.add('selected');
+          } else if (values[date] === 'X') {
+            oxX.classList.add('selected');
+          }
 
           row.appendChild(label);
           row.appendChild(oxO);
@@ -190,7 +221,7 @@
     }
 
     fetchHolidays(() => {
-      // 시작 시 공휴일 반영 후 로딩
+      // 공휴일 불러온 뒤 초기 로딩
     });
   </script>
 </body>
