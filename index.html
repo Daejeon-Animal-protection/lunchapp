@@ -1,4 +1,3 @@
-<!-- 관리자 페이지 - Firebase 연동된 개인별 식사 통계 탭 -->
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -22,20 +21,56 @@
     <button id="btnCharges">💰 식대 징수</button>
   </div>
 
-  <div id="stats" style="display:block">
-    <h1>📊 개인별 식사 통계 
-      <select id="monthSelect">
-        <option value="2025-01">2025년 1월</option>
-        <option value="2025-02">2025년 2월</option>
-        <option value="2025-03">2025년 3월</option>
-        <option value="2025-04">2025년 4월</option>
-        <option value="2025-05" selected>2025년 5월</option>
-      </select>
-      <button onclick="exportTable('statsBody', '개인별식사통계')">엑셀로 추출하기</button>
-    </h1>
+  <div id="stats" style="display:none">
+    <label for="monthSelectStats">📅 월 선택: </label>
+    <select id="monthSelectStats" onchange="renderStatsTable()">
+      <option value="2025-01">2025-01</option>
+      <option value="2025-02">2025-02</option>
+      <option value="2025-03">2025-03</option>
+      <option value="2025-04">2025-04</option>
+      <option value="2025-05" selected>2025-05</option>
+    </select>
+    <h1>📊 개인별 식사 통계</h1>
     <table>
       <thead id="statsHead"></thead>
       <tbody id="statsBody"></tbody>
+    </table>
+  </div>
+
+  <div id="expenses" style="display:none">
+    <label for="monthSelect">📅 월 선택: </label>
+    <select id="monthSelect" onchange="renderExpenseTable()">
+      <option value="2025-01">2025-01</option>
+      <option value="2025-02">2025-02</option>
+      <option value="2025-03">2025-03</option>
+      <option value="2025-04">2025-04</option>
+      <option value="2025-05" selected>2025-05</option>
+    </select>
+    <h1>📋 식당운영비관리</h1>
+    <table>
+      <thead>
+        <tr><th>월</th><th>수입액</th><th>지출액</th><th>차액</th></tr>
+      </thead>
+      <tbody id="expenseTableBody"></tbody>
+    </table>
+    <h2 id="nextMonthEstimate"></h2>
+  </div>
+
+  <div id="charges" style="display:none">
+    <label for="monthSelectCharges">📅 월 선택: </label>
+    <select id="monthSelectCharges" onchange="renderChargeTable()">
+      <option value="2025-01">2025-01</option>
+      <option value="2025-02">2025-02</option>
+      <option value="2025-03">2025-03</option>
+      <option value="2025-04">2025-04</option>
+      <option value="2025-05" selected>2025-05</option>
+    </select>
+    <h1>💰 식대 징수</h1>
+    <table>
+      <thead>
+        <tr><th>이름</th><th>식사횟수</th><th>기본 식비</th><th>추가 식비</th><th>총액</th></tr>
+      </thead>
+      <tbody id="chargeTableBody"></tbody>
     </table>
   </div>
 
@@ -43,63 +78,140 @@
     const firebaseConfig = {
       apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
       authDomain: "lunch-20bb8.firebaseapp.com",
+      databaseURL: "https://lunch-20bb8-default-rtdb.firebaseio.com",
       projectId: "lunch-20bb8",
       storageBucket: "lunch-20bb8.appspot.com",
       messagingSenderId: "218925939220",
-      appId: "1:218925939220:web:4b8940a954f05bfb4a0501",
-      measurementId: "G-CH044PJTEL"
+      appId: "1:218925939220:web:4b8940a954f05bfb4a0501"
     };
     firebase.initializeApp(firebaseConfig);
     const db = firebase.database();
 
-    const employees = [
-      "이영일", "김정이", "이현승", "김성동", "김미지", "박병삼", "김하은", "한수진", "임정아",
-      "김혜경", "심규한", "연경순", "임경순", "이민하", "이유미", "이윤희", "최승필", "홍선주",
-      "석순옥", "정미경", "이창례", "임주연", "김문정", "김미영", "심장식", "손영복", "손영부",
-      "강성필", "김정근", "오화진"
-    ];
+    const employees = ["이영일", "김정이", "이현승", "김성동", "김미지", "박병삼", "김하은", "한수진", "임정아", "김혜경", "심규한", "연경순", "임경순", "이민하", "이유미", "이윤희", "최승필", "홍선주", "석순옥", "정미경", "이창례", "임주연", "김문정", "김미영", "심장식", "손영복", "손영부", "강성필", "김정근", "오화진"];
+
+    const incomeMap = {
+      "2025-01": 265000,
+      "2025-02": 1170000,
+      "2025-03": 1170000,
+      "2025-04": 1905000
+    };
+    const expenseMap = {
+      "2025-01": 404650,
+      "2025-02": 1212510,
+      "2025-03": 1171310,
+      "2025-04": 1656100
+    };
 
     function renderStatsTable() {
-      const selected = document.getElementById("monthSelect").value;
-      const [year, monthStr] = selected.split("-");
-      const month = parseInt(monthStr, 10) - 1;
-      const publicHolidays = ["2025-05-01", "2025-05-05", "2025-05-06"];
-
-      const days = [];
-      const totalDays = new Date(year, month + 1, 0).getDate();
-      for (let d = 1; d <= totalDays; d++) {
-        const date = new Date(year, month, d);
-        const iso = `${year}-${monthStr}-${String(d).padStart(2, '0')}`;
-        if (date.getDay() >= 1 && date.getDay() <= 5 && !publicHolidays.includes(iso)) {
-          days.push(iso);
-        }
-      }
-
+      const selectedMonth = document.getElementById("monthSelectStats")?.value || "2025-05";
+      const tbody = document.getElementById("statsBody");
+      const thead = document.getElementById("statsHead");
       db.ref("mealLogs").once("value").then(snapshot => {
-        const mealData = snapshot.val() || {};
-        const statsHead = document.getElementById("statsHead");
-        const statsBody = document.getElementById("statsBody");
+        const data = snapshot.val() || {};
+        const dateSet = new Set();
 
-        // 열 헤더: 날짜 목록 + 총합
-        statsHead.innerHTML = `<tr><th>이름</th>${days.map(d => `<th>${d.slice(5)}</th>`).join('')}<th>총 식사횟수</th></tr>`;
+        for (const name of employees) {
+          if (!data[name]) continue;
+          for (const date in data[name]) {
+            if (date.startsWith(selectedMonth)) {
+              dateSet.add(date);
+            }
+          }
+        }
 
-        // 각 직원별 행 생성
+        const sortedDates = Array.from(dateSet).sort();
+        thead.innerHTML = `<tr><th>이름</th>${sortedDates.map(d => `<th>${d.slice(5)}</th>`).join('')}<th>총합</th></tr>`;
+
         const rows = employees.map(name => {
-          let total = 0;
-          const tds = days.map(date => {
-            const val = mealData?.[name]?.[date] || '';
-            if (val === 'O') total++;
-            return `<td>${val}</td>`;
+          let count = 0;
+          const cells = sortedDates.map(date => {
+            const mark = data?.[name]?.[date] || '';
+            if (mark === 'O') count++;
+            return `<td>${mark}</td>`;
           }).join('');
-          return `<tr><td>${name}</td>${tds}<td class="highlight">${total}</td></tr>`;
+          return `<tr><td>${name}</td>${cells}<td class="highlight">${count}</td></tr>`;
         });
 
-        statsBody.innerHTML = rows.join('');
+        tbody.innerHTML = rows.join('');
       });
     }
 
-    document.getElementById("monthSelect").addEventListener("change", renderStatsTable);
-    renderStatsTable();
+    function renderChargeTable() {
+      const selectedMonth = document.getElementById("monthSelectCharges")?.value || "2025-05";
+      const tbody = document.getElementById("chargeTableBody");
+      db.ref("mealLogs").once("value").then(snapshot => {
+        const data = snapshot.val() || {};
+        const rows = employees.map(name => {
+          let count = 0;
+          for (const date in data[name]) {
+            if (date.startsWith(selectedMonth) && data[name][date] === 'O') count++;
+          }
+          const basic = 50000;
+          const extra = Math.max(0, count - 10) * 5000;
+          const total = basic + extra;
+          return `<tr><td>${name}</td><td>${count}</td><td>${basic.toLocaleString()}</td><td>${extra.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>`;
+        });
+        tbody.innerHTML = rows.join('');
+      });
+    }
+
+    function renderExpenseTable() {
+      const selectedMonth = document.getElementById("monthSelect")?.value || "2025-05";
+      const tbody = document.getElementById("expenseTableBody");
+      tbody.innerHTML = Object.keys(incomeMap).map(month => {
+        const income = incomeMap[month] || 0;
+        const expense = expenseMap[month] || 0;
+        const diff = income - expense;
+        return `<tr><td>${month}</td><td>${income.toLocaleString()}</td><td>${expense.toLocaleString()}</td><td>${diff.toLocaleString()}</td></tr>`;
+      }).join('');
+
+      const weekdayAverages = {
+        summer: { '월': 8.49, '화': 17.33, '수': 17.94, '목': 18.95, '금': 15.66 },
+        winter: { '월': 7.28, '화': 13.83, '수': 14.81, '목': 15.26, '금': 13.5 }
+      };
+
+      const publicHolidays = ["2025-05-05", "2025-05-06"];
+      const weekDayNames = ['일', '월', '화', '수', '목', '금', '토'];
+      const [year, month] = selectedMonth.split('-').map(Number);
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const counts = { '월': 0, '화': 0, '수': 0, '목': 0, '금': 0 };
+
+      for (let d = 1; d <= daysInMonth; d++) {
+        const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+        const dateObj = new Date(dayStr);
+        const weekday = weekDayNames[dateObj.getDay()];
+        if (counts[weekday] !== undefined && !publicHolidays.includes(dayStr)) {
+          counts[weekday]++;
+        }
+      }
+
+      const season = (month >= 4 && month <= 9) ? 'summer' : 'winter';
+      let estimate = 0;
+      for (const day in counts) {
+        const avg = weekdayAverages[season][day];
+        estimate += avg * counts[day] * 4500;
+      }
+      document.getElementById("nextMonthEstimate").textContent = `${selectedMonth} 예상 지출액: ${Math.round(estimate).toLocaleString()}원`;
+    }
+
+    document.getElementById("btnStats").onclick = () => {
+      document.getElementById("stats").style.display = "block";
+      document.getElementById("expenses").style.display = "none";
+      document.getElementById("charges").style.display = "none";
+      renderStatsTable();
+    };
+    document.getElementById("btnExpenses").onclick = () => {
+      document.getElementById("stats").style.display = "none";
+      document.getElementById("expenses").style.display = "block";
+      document.getElementById("charges").style.display = "none";
+      renderExpenseTable();
+    };
+    document.getElementById("btnCharges").onclick = () => {
+      document.getElementById("stats").style.display = "none";
+      document.getElementById("expenses").style.display = "none";
+      document.getElementById("charges").style.display = "block";
+      renderChargeTable();
+    };
   </script>
 </body>
 </html>
