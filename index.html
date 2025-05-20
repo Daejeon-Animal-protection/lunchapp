@@ -2,34 +2,35 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8">
-  <title>관리자 페이지</title>
+  <title>Lunch Check</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
   <style>
-    body { font-family: sans-serif; background: #f2f2f2; padding: 20px; text-align: center; }
-    h1 { margin-bottom: 20px; }
-    table { width: 100%; border-collapse: collapse; background: white; margin-top: 20px; }
-    th, td { padding: 8px; border: 1px solid #ccc; font-size: 14px; }
-    th { background: #e0e0e0; }
-    .highlight { background-color: #dff0d8; font-weight: bold; }
+    body { font-family: sans-serif; background: #f4f4f4; padding: 20px; text-align: center; }
+    button { margin: 4px; padding: 8px 12px; }
+    .section { display: none; margin-top: 20px; }
+    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+    th, td { border: 1px solid #ccc; padding: 8px; text-align: center; font-size: 12px; }
+    th { background-color: #eee; }
+    .highlight { font-weight: bold; }
+    .small-btn { font-size: 10px; margin-left: 4px; }
+    .expense-input { width: 80px; }
+    #estimateDetails { display: none; text-align: left; max-width: 600px; margin: 10px auto; font-size: 12px; }
   </style>
 </head>
 <body>
+  <!-- 메뉴 버튼 -->
   <div>
     <button id="btnStats">📊 개인별 식사 통계</button>
     <button id="btnExpenses">📋 식당운영비관리</button>
     <button id="btnCharges">💰 식대 징수</button>
+    <button id="btnSettings">⚙️ 설정</button>
   </div>
 
-  <div id="stats" style="display:none">
+  <!-- 개인별 식사 통계 섹션 -->
+  <div id="stats" class="section">
     <label for="monthSelectStats">📅 월 선택: </label>
-    <select id="monthSelectStats" onchange="renderStatsTable()">
-      <option value="2025-01">2025-01</option>
-      <option value="2025-02">2025-02</option>
-      <option value="2025-03">2025-03</option>
-      <option value="2025-04">2025-04</option>
-      <option value="2025-05" selected>2025-05</option>
-    </select>
+    <select id="monthSelectStats" onchange="renderStatsTable()"></select>
     <h1>📊 개인별 식사 통계</h1>
     <table>
       <thead id="statsHead"></thead>
@@ -37,181 +38,205 @@
     </table>
   </div>
 
-  <div id="expenses" style="display:none">
-    <label for="monthSelect">📅 월 선택: </label>
-    <select id="monthSelect" onchange="renderExpenseTable()">
-      <option value="2025-01">2025-01</option>
-      <option value="2025-02">2025-02</option>
-      <option value="2025-03">2025-03</option>
-      <option value="2025-04">2025-04</option>
-      <option value="2025-05" selected>2025-05</option>
-    </select>
+  <!-- 식당운영비관리 섹션 -->
+  <div id="expenses" class="section">
+    <label>📅 월 선택: 
+      <select id="monthSelect" onchange="renderExpenseTable()"></select>
+    </label>
     <h1>📋 식당운영비관리</h1>
+    <button id="addExpenseRow">➕ 행 추가</button>
     <table>
-      <thead>
-        <tr><th>월</th><th>수입액</th><th>지출액</th><th>차액</th></tr>
-      </thead>
+      <thead><tr><th>월</th><th>수입액</th><th>지출액</th><th>차액</th><th>삭제</th></tr></thead>
       <tbody id="expenseTableBody"></tbody>
     </table>
     <h2 id="nextMonthEstimate"></h2>
+    <button id="toggleEstimate">자세히 보기</button>
+    <div id="estimateDetails"></div>
   </div>
 
-  <div id="charges" style="display:none">
-    <label for="monthSelectCharges">📅 월 선택: </label>
-    <select id="monthSelectCharges" onchange="renderChargeTable()">
-      <option value="2025-01">2025-01</option>
-      <option value="2025-02">2025-02</option>
-      <option value="2025-03">2025-03</option>
-      <option value="2025-04">2025-04</option>
-      <option value="2025-05" selected>2025-05</option>
-    </select>
+  <!-- 식대 징수 섹션 -->
+  <div id="charges" class="section">
+    <label>📅 월 선택: <select id="monthSelectCharges" onchange="renderChargeTable()"></select></label>
     <h1>💰 식대 징수</h1>
     <table>
-      <thead>
-        <tr><th>이름</th><th>식사횟수</th><th>기본 식비</th><th>추가 식비</th><th>총액</th></tr>
-      </thead>
+      <thead><tr><th>이름</th><th>식사횟수</th><th>기본 식비</th><th>추가 식비</th><th>총액</th></tr></thead>
       <tbody id="chargeTableBody"></tbody>
     </table>
   </div>
 
-  <script>
-    const firebaseConfig = {
-      apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
-      authDomain: "lunch-20bb8.firebaseapp.com",
-      databaseURL: "https://lunch-20bb8-default-rtdb.firebaseio.com",
-      projectId: "lunch-20bb8",
-      storageBucket: "lunch-20bb8.appspot.com",
-      messagingSenderId: "218925939220",
-      appId: "1:218925939220:web:4b8940a954f05bfb4a0501"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  <!-- 설정 섹션 -->
+  <div id="settings" class="section">
+    <h1>⚙️ 설정</h1>
+    <button id="btnEmployees">👥 직원목록</button>
+    <div id="employeeSettings" style="display:none;">
+      <input id="newEmployee" placeholder="직원이름 입력"/>
+      <button id="addEmployeeBtn">➕ 추가</button>
+      <ul id="employeeList"></ul>
+    </div>
+  </div>
 
-    const employees = ["이영일", "김정이", "이현승", "김성동", "김미지", "박병삼", "김하은", "한수진", "임정아", "김혜경", "심규한", "연경순", "임경순", "이민하", "이유미", "이윤희", "최승필", "홍선주", "석순옥", "정미경", "이창례", "임주연", "김문정", "김미영", "심장식", "손영복", "손영부", "강성필", "김정근", "오화진"];
+<script>
+  // Firebase 초기화
+  firebase.initializeApp({
+    apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
+    authDomain: "lunch-20bb8.firebaseapp.com",
+    databaseURL: "https://lunch-20bb8-default-rtdb.firebaseio.com",
+    projectId: "lunch-20bb8"
+  });
+  const db = firebase.database();
 
-    const incomeMap = {
-      "2025-01": 265000,
-      "2025-02": 1170000,
-      "2025-03": 1170000,
-      "2025-04": 1905000
-    };
-    const expenseMap = {
-      "2025-01": 404650,
-      "2025-02": 1212510,
-      "2025-03": 1171310,
-      "2025-04": 1656100
-    };
+  let employees = [];
+  const regularList = ["이영일","이현승","김성동","박병삼","김하은","김미지","한수진","김혜경","임정아"];
+  const expenseData = [
+    { month:'2025-01', income:265000, expense:404650 },
+    { month:'2025-02', income:1170000, expense:1212510 },
+    { month:'2025-03', income:1170000, expense:1171310 },
+    { month:'2025-04', income:1905000, expense:1656100 }
+  ];
 
-    function renderStatsTable() {
-      const selectedMonth = document.getElementById("monthSelectStats")?.value || "2025-05";
-      const tbody = document.getElementById("statsBody");
-      const thead = document.getElementById("statsHead");
-      db.ref("mealLogs").once("value").then(snapshot => {
-        const data = snapshot.val() || {};
-        const dateSet = new Set();
+  function showSection(id) {
+    document.querySelectorAll('.section').forEach(sec => sec.style.display = 'none');
+    document.getElementById(id).style.display = 'block';
+  }
 
-        for (const name of employees) {
-          if (!data[name]) continue;
-          for (const date in data[name]) {
-            if (date.startsWith(selectedMonth)) {
-              dateSet.add(date);
-            }
-          }
-        }
+  function initMonthOptions() {
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    const months = ['2025-01','2025-02','2025-03','2025-04','2025-05'];
+    ['monthSelectStats','monthSelect','monthSelectCharges'].forEach(id => {
+      const sel = document.getElementById(id);
+      sel.innerHTML = '';
+      months.forEach(val => { const opt = document.createElement('option'); opt.value = val; opt.textContent = val; sel.appendChild(opt); });
+      sel.value = months.includes(ym) ? ym : months[months.length-1];
+    });
+  }
 
-        const sortedDates = Array.from(dateSet).sort();
-        thead.innerHTML = `<tr><th>이름</th>${sortedDates.map(d => `<th>${d.slice(5)}</th>`).join('')}<th>총합</th></tr>`;
-
-        const rows = employees.map(name => {
-          let count = 0;
-          const cells = sortedDates.map(date => {
-            const mark = data?.[name]?.[date] || '';
-            if (mark === 'O') count++;
-            return `<td>${mark}</td>`;
-          }).join('');
-          return `<tr><td>${name}</td>${cells}<td class="highlight">${count}</td></tr>`;
-        });
-
-        tbody.innerHTML = rows.join('');
-      });
+  function renderEmployeeList() {
+    const ul = document.getElementById("employeeList"); ul.innerHTML = '';
+    if (!employees.length) { ul.innerHTML = '<li style="color:gray">등록된 직원이 없습니다.</li>'; return; }
+    const regGroup = document.createElement('li'); regGroup.innerHTML = '<strong>일반직</strong>';
+    const conGroup = document.createElement('li'); conGroup.innerHTML = '<strong>기간제</strong>';
+    function addRow(name, idx, group) {
+      const li = document.createElement('li');
+      const input = document.createElement('input'); input.type='text'; input.value=name; input.disabled=true;
+      const edit = document.createElement('button'); edit.textContent='✏️';
+      const save = document.createElement('button'); save.textContent='📂'; save.style.display='none';
+      const up = document.createElement('button'); up.textContent='🔼';
+      const down = document.createElement('button'); down.textContent='🔽';
+      const move = document.createElement('button'); move.textContent= group==='regular'? '➡️ 기간제':'⬅️ 일반직';
+      edit.onclick = () => { input.disabled=false; input.focus(); edit.style.display='none'; save.style.display='inline-block'; };
+      save.onclick = () => { const nv=input.value.trim(); nv&&nv!==name&&(employees[idx]=nv, db.ref("employees").set(employees), renderEmployeeList()); };
+      const del = document.createElement('button'); del.textContent='❌'; del.onclick=() => { employees.splice(idx,1); db.ref("employees").set(employees); renderEmployeeList(); };
+      move.onclick = () => { regularList=regularList.filter(n=>n!==name); group==='contract'&&regularList.push(name); db.ref("employees").set(employees); renderEmployeeList(); };
+      up.onclick = () => { if(idx>0){ [employees[idx-1],employees[idx]]=[employees[idx],employees[idx-1]]; db.ref("employees").set(employees); renderEmployeeList(); }};
+      down.onclick = () => { if(idx<employees.length-1){ [employees[idx],employees[idx+1]]=[employees[idx+1],employees[idx]]; db.ref("employees").set(employees); renderEmployeeList(); }};
+      [input, edit, save, del, up, down, move].forEach(el=>li.appendChild(el));
+      group==='regular'? regGroup.appendChild(li): conGroup.appendChild(li);
     }
+    employees.forEach((n,i)=> addRow(n,i, regularList.includes(n)? 'regular':'contract'));
+    ul.appendChild(regGroup); ul.appendChild(conGroup);}
+  
 
-    function renderChargeTable() {
-      const selectedMonth = document.getElementById("monthSelectCharges")?.value || "2025-05";
-      const tbody = document.getElementById("chargeTableBody");
-      db.ref("mealLogs").once("value").then(snapshot => {
-        const data = snapshot.val() || {};
-        const rows = employees.map(name => {
-          let count = 0;
-          for (const date in data[name]) {
-            if (date.startsWith(selectedMonth) && data[name][date] === 'O') count++;
-          }
-          const basic = 50000;
-          const extra = Math.max(0, count - 10) * 5000;
-          const total = basic + extra;
-          return `<tr><td>${name}</td><td>${count}</td><td>${basic.toLocaleString()}</td><td>${extra.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>`;
-        });
-        tbody.innerHTML = rows.join('');
-      });
+  function addEmployee() {
+    const input = document.getElementById('newEmployee');
+    const name = input.value.trim();
+    if (name && !employees.includes(name)) {
+      employees.push(name);
+      db.ref('employees').set(employees);
+      input.value = '';
+      renderEmployeeList();
     }
+  }
 
-    function renderExpenseTable() {
-      const selectedMonth = document.getElementById("monthSelect")?.value || "2025-05";
-      const tbody = document.getElementById("expenseTableBody");
-      tbody.innerHTML = Object.keys(incomeMap).map(month => {
-        const income = incomeMap[month] || 0;
-        const expense = expenseMap[month] || 0;
-        const diff = income - expense;
-        return `<tr><td>${month}</td><td>${income.toLocaleString()}</td><td>${expense.toLocaleString()}</td><td>${diff.toLocaleString()}</td></tr>`;
+  function renderStatsTable() {
+    const sel = document.getElementById('monthSelectStats').value;
+    const thead = document.getElementById('statsHead');
+    const tbody = document.getElementById('statsBody');
+    db.ref('mealLogs').once('value').then(snap => {
+      const data = snap.val() || {};
+      const dates = new Set();
+      employees.forEach(n => { if (data[n]) Object.keys(data[n]).forEach(d => { if (d.startsWith(sel)) dates.add(d); }); });
+      const sd = Array.from(dates).sort();
+      thead.innerHTML = `<tr><th>이름</th>${sd.map(d => `<th>${d.slice(5)}</th>`).join('')}<th>총합</th></tr>`;
+      tbody.innerHTML = employees.map(n => {
+        let cnt = 0;
+        const cells = sd.map(d => { const v = data[n]?.[d] || ''; if (v === 'O') cnt++; return `<td>${v}</td>`; }).join('');
+        return `<tr><td>${n}</td>${cells}<td class="highlight">${cnt}</td></tr>`;
       }).join('');
+    });
+  }
 
-      const weekdayAverages = {
-        summer: { '월': 8.49, '화': 17.33, '수': 17.94, '목': 18.95, '금': 15.66 },
-        winter: { '월': 7.28, '화': 13.83, '수': 14.81, '목': 15.26, '금': 13.5 }
+  function renderExpenseTable() {
+    const tbody = document.getElementById('expenseTableBody'); tbody.innerHTML = '';
+    expenseData.forEach((it, i) => {
+      const diff = it.income - it.expense;
+      const tr = document.createElement('tr');
+      tr.innerHTML =
+        `<td>${it.month}</td><td>${it.income.toLocaleString()}</td>` +
+        `<td><span class="expense-value">${it.expense.toLocaleString()}</span> <button class="small-btn edit-expense">✏️</button></td>` +
+        `<td class="highlight">${diff.toLocaleString()}</td><td><button class="small-btn delete-expense">❌</button></td>`;
+      tr.querySelector('.edit-expense').onclick = () => {
+        const span = tr.querySelector('.expense-value');
+        const oldVal = span.textContent.replace(/,/g, '');
+        const input = document.createElement('input'); input.type = 'number'; input.value = oldVal; input.classList.add('expense-input');
+        span.replaceWith(input); input.focus();
+        input.onblur = () => { it.expense = parseInt(input.value) || 0; renderExpenseTable(); };
       };
+      tr.querySelector('.delete-expense').onclick = () => { expenseData.splice(i, 1); renderExpenseTable(); };
+      tbody.appendChild(tr);
+    });
+    updateEstimate();
+  }
 
-      const publicHolidays = ["2025-05-05", "2025-05-06"];
-      const weekDayNames = ['일', '월', '화', '수', '목', '금', '토'];
-      const [year, month] = selectedMonth.split('-').map(Number);
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const counts = { '월': 0, '화': 0, '수': 0, '목': 0, '금': 0 };
+  function renderChargeTable() {
+    const sel = document.getElementById('monthSelectCharges').value;
+    const tbody = document.getElementById('chargeTableBody'); tbody.innerHTML = '';
+    db.ref('mealLogs').once('value').then(snap => {
+      const data = snap.val() || {};
+      employees.forEach(n => {
+        let cnt = 0;
+        Object.entries(data[n] || {}).forEach(([d, v]) => { if (d.startsWith(sel) && v === 'O') cnt++; });
+        const basic = 50000, extra = Math.max(0, cnt - 10) * 5000, total = basic + extra;
+        tbody.innerHTML += `<tr><td>${n}</td><td>${cnt}</td><td>${basic.toLocaleString()}</td><td>${extra.toLocaleString()}</td><td>${total.toLocaleString()}</td></tr>`;
+      });
+    });
+  }
 
-      for (let d = 1; d <= daysInMonth; d++) {
-        const dayStr = `${year}-${String(month).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
-        const dateObj = new Date(dayStr);
-        const weekday = weekDayNames[dateObj.getDay()];
-        if (counts[weekday] !== undefined && !publicHolidays.includes(dayStr)) {
-          counts[weekday]++;
-        }
-      }
-
-      const season = (month >= 4 && month <= 9) ? 'summer' : 'winter';
-      let estimate = 0;
-      for (const day in counts) {
-        const avg = weekdayAverages[season][day];
-        estimate += avg * counts[day] * 4500;
-      }
-      document.getElementById("nextMonthEstimate").textContent = `${selectedMonth} 예상 지출액: ${Math.round(estimate).toLocaleString()}원`;
+  function updateEstimate() {
+    const sel = document.getElementById('monthSelect').value;
+    const [y, m] = sel.split('-').map(Number);
+    const days = new Date(y, m, 0).getDate();
+    const wk = ['일','월','화','수','목','금','토'];
+    const cnt = { '월':0, '화':0, '수':0, '목':0, '금':0 };
+    const hol = ['2025-05-05','2025-05-06'];
+    for (let d = 1; d <= days; d++) {
+      const ds = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const w = wk[new Date(ds).getDay()];
+      if (cnt[w] !== undefined && !hol.includes(ds)) cnt[w]++;
     }
+    const avg = { summer:{'월':8.49,'화':17.33,'수':17.94,'목':18.95,'금':15.66}, winter:{'월':7.28,'화':13.83,'수':14.81,'목':15.26,'금':13.5} };
+    const season = (m >= 4 && m <= 9) ? 'summer' : 'winter';
+    const cost = 4500;
+    let est = 0;
+    Object.entries(cnt).forEach(([d, c]) => { est += avg[season][d] * c * cost; });
+    document.getElementById('nextMonthEstimate').textContent = `${sel} 예상 지출액: ${Math.round(est).toLocaleString()}원`;
+    const expr = Object.entries(cnt).map(([d, c]) => `(${d}:${c}일×${avg[season][d]}명×${cost}원)`).join(' + ');
+    document.getElementById('estimateDetails').innerHTML = `<strong>계산 근거:</strong><br><em>평균×평일×인당 ${cost.toLocaleString()}원</em><br><strong>계산식:</strong>${expr} = ${Math.round(est).toLocaleString()}원`;
+  }
 
-    document.getElementById("btnStats").onclick = () => {
-      document.getElementById("stats").style.display = "block";
-      document.getElementById("expenses").style.display = "none";
-      document.getElementById("charges").style.display = "none";
-      renderStatsTable();
-    };
-    document.getElementById("btnExpenses").onclick = () => {
-      document.getElementById("stats").style.display = "none";
-      document.getElementById("expenses").style.display = "block";
-      document.getElementById("charges").style.display = "none";
-      renderExpenseTable();
-    };
-    document.getElementById("btnCharges").onclick = () => {
-      document.getElementById("stats").style.display = "none";
-      document.getElementById("expenses").style.display = "none";
-      document.getElementById("charges").style.display = "block";
-      renderChargeTable();
-    };
-  </script>
+  document.addEventListener('DOMContentLoaded', () => {
+    initMonthOptions();
+    db.ref('employees').on('value', snap => { employees = snap.val() || []; renderEmployeeList(); });
+    document.getElementById('btnStats').onclick = () => { showSection('stats'); renderStatsTable(); };
+    document.getElementById('btnExpenses').onclick = () => { showSection('expenses'); renderExpenseTable(); };
+    document.getElementById('btnCharges').onclick = () => { showSection('charges'); renderChargeTable(); };
+    document.getElementById('btnSettings').onclick = () => { showSection('settings'); };
+    document.getElementById('btnEmployees').onclick = () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; };
+    document.getElementById('addEmployeeBtn').onclick = addEmployee;
+    document.getElementById('addExpenseRow').onclick = () => { const m = document.getElementById('monthSelect').value; if (!expenseData.some(e=>e.month===m)) expenseData.push({month:m, income:getChargeTotal(), expense:0}); renderExpenseTable(); };
+    document.getElementById('toggleEstimate').onclick = () => { const d = document.getElementById('estimateDetails'); d.style.display = d.style.display==='none'?'block':'none'; };
+    showSection('stats');
+  });
+</script>
 </body>
 </html>
