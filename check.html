@@ -81,7 +81,7 @@
           if (isMonday && contract.includes(name)) return;
           if (data[name] && data[name][todayISO] === 'O') count++;
         });
-        document.getElementById('todayStat').textContent = `✅ 오늘 식사한 인원: ${count}명`;
+        document.getElementById('todayStat').textContent = `✅ 오늘 식사하는 인원: ${count}명`;
       });
     }
 
