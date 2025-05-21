@@ -5,22 +5,23 @@
   <title>점심 식사 체크</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
-  <style>
+ <style>
     html, body { width:100%; height:100%; margin:0; padding:0; }
-    body { font-family: 'Segoe UI', sans-serif; background: #f2f2f2; display:flex; flex-direction:column; }
-    h2 { margin:10px 0; font-size:24px; text-align:center; }
-    #todayStat { font-size:16px; color:#333; text-align:center; margin-bottom:10px; }
-    #main, #check { flex:1; display:flex; flex-direction:column; align-items:center; overflow:auto; }
-    .button { padding:6px 12px; margin:5px; font-size:14px; cursor:pointer; border:none; border-radius:8px; background-color:#2196F3; color:white; }
+    body {      font-family: 'Segoe UI', sans-serif;      background: #f2f2f2;      display:flex;      flex-direction:column;      font-size: 18px;    }
+    h2 {      margin:12px 0;      font-size: 28px;      text-align:center;    }
+    #todayStat {      font-size:18px;      color:#333;      text-align:center;      margin-bottom:12px;    }
+    #main, #check {      flex:1;      display:flex;      flex-direction:column;      align-items:center;      overflow:auto;    }
+    .button {      padding:10px 20px;      margin:8px;      font-size:16px      cursor:pointer;      border:none;      border-radius:8px;      background-color:#2196F3;      color:white;    }
     .button:hover { background-color:#1976D2; }
-    .ox-btn { padding:6px 12px; margin:0 4px; border-radius:6px; border:none; font-size:16px; background-color:#e0e0e0; cursor:pointer; }
+    .ox-btn {      padding:8px 14px;      margin:0 6px;      border-radius:6px;      border:none;      font-size:18px;      background-color:#e0e0e0;      cursor:pointer;    }
     .ox-btn.selected { background-color:#4caf50; color:white; }
-    .grid { width:90%; display:grid; grid-template-columns:repeat(auto-fill, minmax(120px,1fr)); gap:10px; justify-items:center; }
-    .name-btn { width:100%; background:#fff; border:1px solid #aaa; border-radius:10px; padding:10px; cursor:pointer; font-size:15px; }
-    .group-label { font-weight:bold; margin-top:20px; font-size:18px; color:#555; }
-    #dates { width:90%; flex:1; overflow-y:auto; text-align:center; }
-    .date-row { margin:6px 0; display:flex; justify-content:center; align-items:center; }
-    .today-highlight { border:2px solid #f44336; border-radius:8px; padding:4px; background-color:#ffecec; }
+    .grid {      width:95%;      display:grid;      grid-template-columns:repeat(auto-fill, minmax(160px,1fr));
+      gap:14px;      justify-items:center;    }
+    .name-btn {      width:100%;      background:#fff;      border:1px solid #aaa;      border-radius:12px;      padding:14px;      cursor:pointer;      font-size:18px;    }
+    .group-label {      font-weight:bold;      margin-top:24px;      font-size:20px;      color:#555;    }
+   #dates {      width:95%;      flex:1;      overflow-y:auto;      text-align:center;    }
+    .date-row {      margin:8px 0;      display:flex;      justify-content:center;      align-items:center;      font-size:18px;    }    .today-highlight {
+      border:2px solid #f44336;      border-radius:8px;      padding:6px;      background-color:#ffecec;    }
   </style>
 </head>
 <body>
