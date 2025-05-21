@@ -85,41 +85,42 @@
       });
     }
 
-    // 공휴일 (하드코딩)
-    const holidays = [
-      '2025-05-05', // 어린이날
-      '2025-05-06', // 대체공휴일
-      '2025-06-03', // 석가탄신일 (휴일)
-      '2025-06-06'  // 현충일
-    ];
-    function isHoliday(dateStr) { return holidays.includes(dateStr); }
+    // 고정 공휴일, 휴무자, 야간조 (6월 기준)
+    const holidays = ['2025-05-05','2025-05-06','2025-06-03','2025-06-06'];
+    const juneLeave = ['2025-06-01','2025-06-06']; // 6월 휴무자 날짜
+    const juneNight = ['2025-06-03','2025-06-10','2025-06-11']; // 6월 야간조 날짜
+    const nightNames = ["연경순","임경순","최승필","홍선주","석순옥","이창례","임주연","김미영","심장식","손영복","손영부","강성필","오화진"];
+
+    function isHoliday(date) { return holidays.includes(date); }
 
     function generateWorkdaysForMonth(year, month) {
       const days = [];
       const total = new Date(year, month + 1, 0).getDate();
       const mm = String(month + 1).padStart(2, '0');
       for (let d = 1; d <= total; d++) {
-        const iso = `${year}-${mm}-${String(d).padStart(2,'0')}`;
+        const iso = `${year}-${mm}-${String(d).padStart(2, '0')}`;
         const dow = new Date(iso).getDay();
-        if (dow >= 1 && dow <= 5 && !isHoliday(iso)) days.push(iso);
+        if (dow < 1 || dow > 5) continue;
+        if (isHoliday(iso)) continue;
+        days.push(iso);
       }
       return days;
     }
 
     function renderMonthOptions() {
       const sel = document.getElementById('monthSelect'); sel.innerHTML = '';
-      for (let m=0; m<12; m++) {
-        const opt = document.createElement('option'); opt.value=m; opt.text=(m+1)+'월';
-        if (m===thisMonth) opt.selected=true;
+      for (let m = 0; m < 12; m++) {
+        const opt = document.createElement('option'); opt.value = m; opt.textContent = `${m+1}월`;
+        if (m === thisMonth) opt.selected = true;
         sel.appendChild(opt);
       }
-      sel.onchange = ()=>renderDates(currentName, Number(sel.value));
+      sel.onchange = () => renderDates(currentName, Number(sel.value));
     }
 
     function openCheck(name) {
       currentName = name;
-      document.getElementById('main').style.display='none';
-      document.getElementById('check').style.display='block';
+      document.getElementById('main').style.display = 'none';
+      document.getElementById('check').style.display = 'block';
       renderMonthOptions();
       renderDates(name, thisMonth);
     }
@@ -128,30 +129,59 @@
       document.getElementById('selectedName').textContent = `${name} - ${thisYear}년 ${month+1}월`;
       const days = generateWorkdaysForMonth(thisYear, month);
       db.ref(`mealLogs/${name}`).once('value').then(snapshot => {
-        values = snapshot.val()||{};
-        const container = document.getElementById('dates'); container.innerHTML='';
-        days.forEach(iso=>{
-          const row=document.createElement('div');
-          const lbl=document.createElement('span'); lbl.textContent=`${iso}: `;
-          const btnO=document.createElement('button'); btnO.textContent='O'; btnO.className='ox-btn';
-          const btnX=document.createElement('button'); btnX.textContent='X'; btnX.className='ox-btn';
-          if(values[iso]==='O') btnO.classList.add('selected');
-          if(values[iso]==='X') btnX.classList.add('selected');
-          btnO.onclick=()=>{values[iso]='O';btnO.classList.add('selected');btnX.classList.remove('selected');};
-          btnX.onclick=()=>{values[iso]='X';btnX.classList.add('selected');btnO.classList.remove('selected');};
-          if(iso===todayISO) row.classList.add('today-highlight');
-          row.append(lbl,btnO,btnX);
+        values = snapshot.val() || {};
+        const container = document.getElementById('dates'); container.innerHTML = '';
+        days.forEach(date => {
+          // 기간제 월요일 휴무
+          if (contract.includes(name) && new Date(date).getDay() === 1) {
+            values[date] = 'X';
+          }
+          // 고정 휴무자
+          if (juneLeave.includes(date)) {
+            values[date] = 'X';
+          }
+          // 야간조 직원
+          if (nightNames.includes(name) && juneNight.includes(date)) {
+            values[date] = 'X';
+          }
+          const row = document.createElement('div');
+          const lbl = document.createElement('span'); lbl.textContent = `${date}: `;
+          const btnO = document.createElement('button'); btnO.textContent = 'O'; btnO.className = 'ox-btn';
+          const btnX = document.createElement('button'); btnX.textContent = 'X'; btnX.className = 'ox-btn';
+          if (values[date] === 'O') btnO.classList.add('selected');
+          if (values[date] === 'X') btnX.classList.add('selected');
+          btnO.onclick = () => { values[date] = 'O'; btnO.classList.add('selected'); btnX.classList.remove('selected'); };
+          btnX.onclick = () => { values[date] = 'X'; btnX.classList.add('selected'); btnO.classList.remove('selected'); };
+          if (date === todayISO) row.classList.add('today-highlight');
+          row.append(lbl, btnO, btnX);
           container.appendChild(row);
         });
       });
     }
 
-    function goBack(){document.getElementById('check').style.display='none';document.getElementById('main').style.display='block';}
-    function saveMealLog(){db.ref(`mealLogs/${currentName}`).set(values).then(()=>{alert('저장되었습니다');goBack();});}
+    function goBack() {
+      document.getElementById('check').style.display = 'none';
+      document.getElementById('main').style.display = 'block';
+    }
+
+    function saveMealLog() {
+      db.ref(`mealLogs/${currentName}`).set(values).then(() => {
+        alert('저장되었습니다');
+        goBack();
+      });
+    }
 
     // 초기 렌더링
-    regular.forEach(n=>{const btn=document.createElement('button');btn.className='name-btn';btn.textContent=n;btn.onclick=()=>openCheck(n);document.getElementById('regular').appendChild(btn);}  );
-    contract.forEach(n=>{const btn=document.createElement('button');btn.className='name-btn';btn.textContent=n;btn.onclick=()=>openCheck(n);document.getElementById('contract').appendChild(btn);}  );
+    regular.forEach(n => {
+      const btn = document.createElement('button'); btn.className = 'name-btn'; btn.textContent = n;
+      btn.onclick = () => openCheck(n);
+      document.getElementById('regular').appendChild(btn);
+    });
+    contract.forEach(n => {
+      const btn = document.createElement('button'); btn.className = 'name-btn'; btn.textContent = n;
+      btn.onclick = () => openCheck(n);
+      document.getElementById('contract').appendChild(btn);
+    });
 
     // 초기 오늘 통계
     renderTodayStat();
