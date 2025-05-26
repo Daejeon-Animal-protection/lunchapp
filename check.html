@@ -105,25 +105,50 @@
       }).catch(err=>console.error('renderTodayStat error:', err));
     }
 
-    // 공휴일 목록 (예시: 6월 공휴일)
-    const holidays = ['2025-06-03','2025-06-06'];
-    // 근무일 생성 (평일 + 공휴일 제외)
-    function generateWorkdaysForMonth(y,m) {
-      const days=[];
-      const total=new Date(y,m+1,0).getDate();
-      const mm=String(m+1).padStart(2,'0');
-      for(let d=1; d<=total; d++){
-        const iso = `${y}-${mm}-${String(d).padStart(2,'0')}`;
-        const dow = new Date(iso).getDay();
-        // 주말 제외
-        if(dow<1||dow>5) continue;
-        // 공휴일 제외
-        if(holidays.includes(iso)) continue;
-        days.push(iso);
-      }
-      return days;
+//날짜목록 생성(공공api호출)
+  async function getKoreanHolidays(year, month) {
+    const serviceKey = 'dtZOAdfRz5FEy2NGFBIeAHoQhfimWGWodsA2Wzcr%2BeSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g%3D%3D';
+    const mm = String(month).padStart(2, '0');
+    const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
+              + `?ServiceKey=${serviceKey}&solYear=${year}&solMonth=${mm}&_type=json`;
+
+    // ① fetch 후 text로 읽어오기
+    const res = await fetch(url);
+    const text = await res.text();
+
+    // ② JSON 파싱 시도 → 실패하면 XML로 파싱
+    try {
+      const json = JSON.parse(text);
+      const items = json.response.body.items?.item || [];
+      return items.map(i => {
+        const s = i.locdate.toString();
+        return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+      });
+    } catch (_) {
+      const parser = new DOMParser();
+      const xmlDoc = parser.parseFromString(text, 'application/xml');
+      const xmlItems = xmlDoc.getElementsByTagName('item');
+      return Array.from(xmlItems).map(item => {
+        const s = item.getElementsByTagName('locdate')[0].textContent;
+        return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+      });
     }
-    
+  }
+    async function generateWorkdaysForMonth(y, m) {
+    const holidays = await getKoreanHolidays(y, m + 1);
+    const days = [];
+    const total = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, '0');
+
+    for (let d = 1; d <= total; d++) {
+      const iso = `${y}-${mm}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(iso).getDay();
+      if (dow < 1 || dow > 5) continue;        // 주말 제외
+      if (holidays.includes(iso)) continue;     // 공휴일 제외
+      days.push(iso);
+    }
+    return days;
+  }
 
     // 월 선택 렌더
     function renderMonthOptions() {
@@ -142,9 +167,9 @@
     }
 
     // 날짜별 O/X 렌더
-    function renderDates(name, month) {
+   async function renderDates(name, month) {
       document.getElementById('selectedName').textContent=`${name} - ${thisYear}년 ${month+1}월`;
-      const days=generateWorkdaysForMonth(thisYear,month);
+      const days=await generateWorkdaysForMonth(thisYear,month);
       db.ref(`mealLogs/${name}`).once('value').then(snap=>{
         values=snap.val()||{}; const cont=document.getElementById('dates'); cont.innerHTML='';
         days.forEach(date=>{
