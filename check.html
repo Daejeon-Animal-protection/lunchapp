@@ -105,39 +105,24 @@
       }).catch(err=>console.error('renderTodayStat error:', err));
     }
 
-//날짜목록 생성(공공api호출)
-  async function generateWorkdaysForMonth(y, m) {
-  const serviceKey = 'dtZOAdfRz5FEy2NGFBIeAHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g%3D%3D';
-  const mm = String(m + 1).padStart(2, '0');
-  const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?ServiceKey=${serviceKey}&solYear=${y}&solMonth=${mm}&_type=json`;
-
-  const holidays = await fetch(url)
-    .then(res => res.json())
-    .then(data => {
-      const items = data.response.body.items?.item || [];
-      return items.map(i => {
-        const s = i.locdate.toString();
-        return `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
-      });
-    })
-    .catch(err => {
-      console.error("공휴일 로딩 실패:", err);
-      return [];
-    });
-
-  const days = [];
-  const total = new Date(y, m + 1, 0).getDate();
-
-  for (let d = 1; d <= total; d++) {
-    const iso = `${y}-${mm}-${String(d).padStart(2, '0')}`;
-    const dow = new Date(iso).getDay();
-    if (dow < 1 || dow > 5) continue;
-    if (holidays.includes(iso)) continue;
-    days.push(iso);
-  }
-
-  return days;
-}
+    // 공휴일 목록 (예시: 6월 공휴일)
+    const holidays = ['2025-06-03','2025-06-06'];
+    // 근무일 생성 (평일 + 공휴일 제외)
+    function generateWorkdaysForMonth(y,m) {
+      const days=[];
+      const total=new Date(y,m+1,0).getDate();
+      const mm=String(m+1).padStart(2,'0');
+      for(let d=1; d<=total; d++){
+        const iso = `${y}-${mm}-${String(d).padStart(2,'0')}`;
+        const dow = new Date(iso).getDay();
+        // 주말 제외
+        if(dow<1||dow>5) continue;
+        // 공휴일 제외
+        if(holidays.includes(iso)) continue;
+        days.push(iso);
+      }
+      return days;
+    }
     
 
     // 월 선택 렌더
