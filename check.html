@@ -107,15 +107,18 @@
 
 //날짜목록 생성(공공api호출)
   async function getKoreanHolidays(year, month) {
-    const serviceKey = 'dtZOAdfRz5FEy2NGFBIeAHoQhfimWGWodsA2Wzcr%2BeSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g%3D%3D';
-    const mm = String(month).padStart(2, '0');
-    const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
-              + `?ServiceKey=${serviceKey}&solYear=${year}&solMonth=${mm}&_type=json`;
+    const rawKey = 'dtZOAdfRz5FEy2NGFBIeAHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
+  const serviceKey = encodeURIComponent(rawKey);
+  const mm = String(month).padStart(2, '0');
+  const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
+            + `?ServiceKey=${serviceKey}`
+            + `&solYear=${year}`
+            + `&solMonth=${mm}`
+            + `&numOfRows=31&pageNo=1`      // 한 달 최대 31일치 공휴일까지 받아오도록
+            + `&_type=json`;
 
-    // ① fetch 후 text로 읽어오기
-    const res = await fetch(url);
-    const text = await res.text();
-
+  const res = await fetch(url);
+  const text = await res.text();
     // ② JSON 파싱 시도 → 실패하면 XML로 파싱
     try {
       const json = JSON.parse(text);
@@ -136,6 +139,7 @@
   }
     async function generateWorkdaysForMonth(y, m) {
     const holidays = await getKoreanHolidays(y, m + 1);
+      console.log(`📅 ${y}-${String(m+1).padStart(2,'0')} 공휴일:`, holidays);
     const days = [];
     const total = new Date(y, m + 1, 0).getDate();
     const mm = String(m + 1).padStart(2, '0');
@@ -171,7 +175,7 @@
       document.getElementById('selectedName').textContent=`${name} - ${thisYear}년 ${month+1}월`;
       const days=await generateWorkdaysForMonth(thisYear,month);
       db.ref(`mealLogs/${name}`).once('value').then(snap=>{
-        values=snap.val()||{}; const cont=document.getElementById('dates'); cont.innerHTML='';
+      const values=snap.val()||{}; const cont=document.getElementById('dates'); cont.innerHTML='';
         days.forEach(date=>{
           if(contract.includes(name)&&new Date(date).getDay()===1) values[date]='X';
           if(leaveDatesMap[name]&&leaveDatesMap[name][date]) values[date]='X';
