@@ -107,7 +107,7 @@
 
 //날짜목록 생성(공공api호출)
   async function getKoreanHolidays(year, month) {
-    const rawKey = 'dtZOAdfRz5FEy2NGFBIeAHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
+    const rawKey = 'dtZOAdfRz5FEy2NGFBIEaHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
   const serviceKey = encodeURIComponent(rawKey);
   const mm = String(month).padStart(2, '0');
   const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
@@ -117,8 +117,13 @@
             + `&numOfRows=31&pageNo=1`      // 한 달 최대 31일치 공휴일까지 받아오도록
             + `&_type=json`;
 
+    console.log('🌐 Fetching holiday URL:', url);
+
+    
   const res = await fetch(url);
   const text = await res.text();
+    console.log('📄 Raw holiday response:', text);
+    
     // ② JSON 파싱 시도 → 실패하면 XML로 파싱
     try {
       const json = JSON.parse(text);
