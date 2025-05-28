@@ -76,14 +76,13 @@
     const todayISO = today.toISOString().split('T')[0];
     document.getElementById('todayDate').textContent = todayISO;
 
-    // 데이터맵 및 로딩 Promise
+    // 데이터 로딩 Promise
     const leaveDatesMap = {}, nightShiftMap = {};
     const leavePromise = db.ref('leave').once('value').then(snap => Object.assign(leaveDatesMap, snap.val()||{}));
     const nightPromise = db.ref('nightShift').once('value').then(snap => Object.assign(nightShiftMap, snap.val()||{}));
 
-    // 초기 UI 렌더링: 데이터 로드 후 실행
+    // 초기 UI 렌더링
     Promise.all([leavePromise, nightPromise]).then(() => {
-      // 직원 버튼 생성
       regular.forEach(name => {
         const btn = document.createElement('button'); btn.className='name-btn'; btn.textContent=name; btn.onclick=()=>openCheck(name);
         document.getElementById('regular').appendChild(btn);
@@ -98,75 +97,144 @@
     // 오늘 통계 렌더
     function renderTodayStat() {
       db.ref('mealLogs').once('value').then(snap => {
-        const data = snap.val()||{}; let count=0;
+        const data = snap.val()||{};
+        let count = 0;
         const isMon = new Date(todayISO).getDay()===1;
-        names.forEach(n=>{ if(isMon&&contract.includes(n)) return; if(data[n]&&data[n][todayISO]==='O') count++; });
-        document.getElementById('todayStat').textContent=`✅ 오늘 식사하는 인원: ${count}명`;
-      }).catch(err=>console.error('renderTodayStat error:', err));
+        names.forEach(n => {
+          if (isMon && contract.includes(n)) return;
+          if (data[n] && data[n][todayISO] === 'O') count++;
+        });
+        document.getElementById('todayStat').textContent = `✅ 오늘 식사하는 인원: ${count}명`;
+      }).catch(err => console.error('renderTodayStat error:', err));
     }
 
-    // 공휴일 목록 (예시: 6월 공휴일)
-    const holidays = ['2025-06-03','2025-06-06'];
-    // 근무일 생성 (평일 + 공휴일 제외)
-    function generateWorkdaysForMonth(y,m) {
-      const days=[];
-      const total=new Date(y,m+1,0).getDate();
-      const mm=String(m+1).padStart(2,'0');
-      for(let d=1; d<=total; d++){
-        const iso = `${y}-${mm}-${String(d).padStart(2,'0')}`;
-        const dow = new Date(iso).getDay();
-        // 주말 제외
-        if(dow<1||dow>5) continue;
-        // 공휴일 제외
-        if(holidays.includes(iso)) continue;
-        days.push(iso);
+    // 공휴일 API 호출
+    async function getKoreanHolidays(y, m) {
+      const rawKey = 'dtZOAdfRz5FEy2NGFBIEaHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
+      const serviceKey = encodeURIComponent(rawKey);
+      const mm = String(m).padStart(2, '0');
+      const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo`
+        + `?ServiceKey=${serviceKey}`
+        + `&solYear=${y}`
+        + `&solMonth=${mm}`
+        + `&numOfRows=31&pageNo=1&_type=json`;
+      console.log('🌐 Fetching holiday URL:', url);
+      const res = await fetch(url);
+      const text = await res.text();
+      console.log('📄 Raw holiday response:', text);
+      try {
+        const json = JSON.parse(text);
+        const items = json.response.body.items?.item || [];
+        return items.map(i => {
+          const s = i.locdate.toString();
+          return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+        });
+      } catch (error) {
+        const parser = new DOMParser();
+        const xmlDoc = parser.parseFromString(text, 'application/xml');
+        const xmlItems = xmlDoc.getElementsByTagName('item');
+        return Array.from(xmlItems).map(item => {
+          const s = item.getElementsByTagName('locdate')[0].textContent;
+          return `${s.slice(0,4)}-${s.slice(4,6)}-${s.slice(6,8)}`;
+        });
       }
-      return days;
     }
-    
 
-    // 월 선택 렌더
+    // 월 옵션 렌더
     function renderMonthOptions() {
-      const sel=document.getElementById('monthSelect'); sel.innerHTML='';
-      for(let m=0;m<12;m++){ const opt=document.createElement('option'); opt.value=m; opt.textContent=`${m+1}월`; if(m===thisMonth) opt.selected=true; sel.appendChild(opt); }
+      const sel = document.getElementById('monthSelect'); sel.innerHTML = '';
+      for (let m = 0; m < 12; m++) {
+        const opt = document.createElement('option'); opt.value = m; opt.textContent = `${m+1}월`;
+        if (m === thisMonth) opt.selected = true;
+        sel.appendChild(opt);
+      }
       sel.onchange = () => renderDates(currentName, Number(sel.value));
     }
 
-    // 직원 상세창 오픈
+    // 상세 뷰 오픈
     function openCheck(name) {
-      currentName=name;
-      document.getElementById('main').style.display='none';
-      document.getElementById('check').style.display='flex';
+      currentName = name;
+      document.getElementById('main').style.display = 'none';
+      document.getElementById('check').style.display = 'flex';
       renderMonthOptions();
-      Promise.all([leavePromise, nightPromise]).then(() => renderDates(name,thisMonth));
+      renderDates(name, thisMonth);
     }
+    
+async function generateWorkdaysForMonth(y, m) {
+    const holidays = await getKoreanHolidays(y, m + 1);
+      console.log(`📅 ${y}-${String(m+1).padStart(2,'0')} 공휴일:`, holidays);
+    const days = [];
+    const total = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, '0');
+
+    for (let d = 1; d <= total; d++) {
+      const iso = `${y}-${mm}-${String(d).padStart(2, '0')}`;
+      const dow = new Date(iso).getDay();
+      if (dow < 1 || dow > 5) continue;        // 주말 제외
+      if (holidays.includes(iso)) continue;     // 공휴일 제외
+      days.push(iso);
+    }
+    return days;
+  }
 
     // 날짜별 O/X 렌더
-    function renderDates(name, month) {
-      document.getElementById('selectedName').textContent=`${name} - ${thisYear}년 ${month+1}월`;
-      const days=generateWorkdaysForMonth(thisYear,month);
-      db.ref(`mealLogs/${name}`).once('value').then(snap=>{
-        values=snap.val()||{}; const cont=document.getElementById('dates'); cont.innerHTML='';
-        days.forEach(date=>{
-          if(contract.includes(name)&&new Date(date).getDay()===1) values[date]='X';
-          if(leaveDatesMap[name]&&leaveDatesMap[name][date]) values[date]='X';
-          if(nightOffList.includes(name)&&nightShiftMap[name]&&nightShiftMap[name][date]) values[date]='X';
-          const row=document.createElement('div'); row.className='date-row';
-          if(date===todayISO) row.classList.add('today-highlight');
-          const lbl=document.createElement('span'); lbl.textContent=`${date}: `;
-          const btnO=document.createElement('button'); btnO.textContent='O'; btnO.className='ox-btn';
-          const btnX=document.createElement('button'); btnX.textContent='X'; btnX.className='ox-btn';
-          if(values[date]==='O') btnO.classList.add('selected');
-          if(values[date]==='X') btnX.classList.add('selected');
-          btnO.onclick=()=>{values[date]='O';btnO.classList.add('selected');btnX.classList.remove('selected');};
-          btnX.onclick=()=>{values[date]='X';btnX.classList.add('selected');btnO.classList.remove('selected');};
-          row.append(lbl,btnO,btnX); cont.appendChild(row);
-        });
-      }).catch(err=>console.error('renderDates error:',err));
+  async function renderDates(name, month) {
+  console.log('▶ renderDates 호출:', name, month);
+
+  try {
+    // 1) selectedName 요소 체크
+    const selEl = document.getElementById('selectedName');
+    console.log('  ▶ #selectedName:', selEl);
+    if (!selEl) throw new Error('#selectedName 요소를 찾을 수 없습니다.');
+
+    selEl.textContent = `${name} - ${thisYear}년 ${month+1}월`;
+
+    // 2) dates 컨테이너 체크
+    const cont = document.getElementById('dates');
+    console.log('  ▶ #dates 컨테이너:', cont);
+    if (!cont) throw new Error('#dates 요소를 찾을 수 없습니다.');
+
+    // 3) DB에서 기존값 가져오기
+    const snap = await db.ref(`mealLogs/${name}`).once('value');
+    values = snap.val() || {};
+    console.log('  ▶ DB에서 가져온 values:', values);
+
+    // 4) 날짜 배열 생성
+    const days = await generateWorkdaysForMonth(thisYear, month);
+    console.log('  ▶ 생성된 days 배열:', days);
+
+    // 5) 렌더링
+    cont.innerHTML = '';
+    days.forEach(date => {
+      const row = document.createElement('div');
+      row.className = 'date-row';
+      if (date === todayISO) row.classList.add('today-highlight');
+      const lbl = document.createElement('span'); lbl.textContent = `${date}: `;
+        const btnO = document.createElement('button'); btnO.textContent = 'O'; btnO.className = 'ox-btn';
+        const btnX = document.createElement('button'); btnX.textContent = 'X'; btnX.className = 'ox-btn';
+        if (values[date] === 'O') btnO.classList.add('selected');
+        if (values[date] === 'X') btnX.classList.add('selected');
+        btnO.onclick = () => { values[date] = 'O'; btnO.classList.add('selected'); btnX.classList.remove('selected'); };
+        btnX.onclick = () => { values[date] = 'X'; btnX.classList.add('selected'); btnO.classList.remove('selected'); };
+        row.append(lbl, btnO, btnX); 
+      cont.appendChild(row);
+    }); console.log('✅ renderDates 완료');
+  } catch (err) {
+    console.error('❌ renderDates 중 에러:', err);
+  }
+
     }
 
-    function goBack() { document.getElementById('check').style.display='none'; document.getElementById('main').style.display='flex'; }
-    function saveMealLog() { db.ref(`mealLogs/${currentName}`).set(values).then(()=>{ alert('저장되었습니다'); goBack(); }).catch(err=>console.error('saveMealLog error:',err)); }
+    function goBack() {
+      document.getElementById('check').style.display = 'none';
+      document.getElementById('main').style.display = 'flex';
+    }
+
+    function saveMealLog() {
+      db.ref(`mealLogs/${currentName}`).update(values)
+        .then(() => { alert('저장되었습니다'); goBack(); })
+        .catch(err => console.error('saveMealLog error:', err));
+    }
   </script>
 </body>
 </html>
