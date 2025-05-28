@@ -102,7 +102,8 @@
         const isMon = new Date(todayISO).getDay()===1;
         names.forEach(n => {
           if (isMon && contract.includes(n)) return;
-          if (data[n] && data[n][todayISO] === 'O') count++;
+           const v = data[n]?.[todayISO];
+      if (v !== 'X') count++;
         });
         document.getElementById('todayStat').textContent = `✅ 오늘 식사하는 인원: ${count}명`;
       }).catch(err => console.error('renderTodayStat error:', err));
@@ -206,6 +207,10 @@ async function generateWorkdaysForMonth(y, m) {
     // 5) 렌더링
     cont.innerHTML = '';
     days.forEach(date => {
+      if (contract.includes(name) && new Date(date).getDay() === 1)     values[date] = 'X';
+if (leaveDatesMap[name] && leaveDatesMap[name][date])values[date] = 'X';
+if (nightOffList.includes(name) && nightShiftMap[name]&&nightShiftMap[name][date]) values[date] = 'X';
+       if (new Date(date) < new Date(todayISO) && values[date] === undefined) values[date] = 'X';
       const row = document.createElement('div');
       row.className = 'date-row';
       if (date === todayISO) row.classList.add('today-highlight');
