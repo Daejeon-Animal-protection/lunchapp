@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>점심 식사 체크</title>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  
   <style>
     html, body { width:100%; height:100%; margin:0; padding:0; }
     body { font-family: 'Segoe UI', sans-serif; background:#f2f2f2; display:flex; flex-direction:column; font-size:18px; }
@@ -41,8 +40,10 @@
     </div>
     <div id="dates"></div>
   </div>
-  <script>
-    // Firebase 초기화
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+<script>
+   
     const firebaseConfig = {
       apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
       authDomain: "lunch-20bb8.firebaseapp.com",
@@ -50,58 +51,127 @@
       projectId: "lunch-20bb8",
       storageBucket: "lunch-20bb8.appspot.com",
       messagingSenderId: "218925939220",
-      appId: "1:218925939220:web:4b8940a954f05bfb4a0501"
-    };
-    if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
-
+      appId: "1:218925939220:web:4b8940a954f05bfb4a0501" };
+      
     // 전역 변수
     let currentName = '';
     let values = {};
 
-    // 직원 목록
-    const names = ["이영일","김정이","이현승","김성동","김미지","박병삼","김하은","한수진","임정아","김혜경",
-                   "심규한","연경순","임경순","이민하","이유미","이윤희","최승필","홍선주","석순옥","정미경",
-                   "이창례","임주연","김문정","김미영","심장식","손영복","손영부","강성필","김정근","오화진"];
-    const regular = names.slice(0,10);
-    const contract = names.slice(10);
+  // ─── Firebase 초기화 ───────────────────────────────────────
+if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
 
-    // 제외할 야간조 목록
-    const nightOffList = ["연경순","임경순","최승필","홍선주","석순옥","이창례","임주연","김미영",
-                          "심장식","손영복","손영부","강성필","오화진"];
+// ─── 제외할 야간조(휴식) 목록 ───────────────────────────────
+const nightOffList = [
+  "연경순","임경순","최승필","홍선주","석순옥","이창례","임주연","김미영",
+  "심장식","손영복","손영부","강성필","오화진"
+];
 
-    // 오늘 날짜 설정
-    const today = new Date(); today.setHours(today.getHours()+9);
-    const thisYear = today.getFullYear(), thisMonth = today.getMonth();
-    const todayISO = today.toISOString().split('T')[0];
-    document.getElementById('todayDate').textContent = todayISO;
+// ─── 오늘 날짜 (한국시간) ────────────────────────────────────
+const today = new Date();
+today.setHours(today.getHours() + 9);
+const thisYear  = today.getFullYear();
+const thisMonth = today.getMonth();
+const todayISO  = today.toISOString().split('T')[0];
+document.getElementById('todayDate').textContent = todayISO;
 
-    // 데이터 로딩 Promise
-    const leaveDatesMap = {}, nightShiftMap = {};
-    const leavePromise = db.ref('leave').once('value').then(snap => Object.assign(leaveDatesMap, snap.val()||{}));
-    const nightPromise = db.ref('nightShift').once('value').then(snap => Object.assign(nightShiftMap, snap.val()||{}));
+// ─── 전역 변수 ─────────────────────────────────────────────
+let employees     = [];
+let regularList   = [];
+let contractList  = [];
+const leaveDatesMap  = {};
+const nightShiftMap  = {};
 
-    // 초기 UI 렌더링
-    Promise.all([leavePromise, nightPromise]).then(() => {
-      regular.forEach(name => {
-        const btn = document.createElement('button'); btn.className='name-btn'; btn.textContent=name; btn.onclick=()=>openCheck(name);
-        document.getElementById('regular').appendChild(btn);
-      });
-      contract.forEach(name => {
-        const btn = document.createElement('button'); btn.className='name-btn'; btn.textContent=name; btn.onclick=()=>openCheck(name);
-        document.getElementById('contract').appendChild(btn);
-      });
-      renderTodayStat();
-    }).catch(err => console.error('초기 데이터 로드 에러:', err));
+// ─── 데이터 불러오기 Promise ────────────────────────────────
+const empPromise = db.ref('employees').once('value')
+  .then(snap => { employees = snap.val() || []; });
+
+const regPromise = db.ref('employeeRoles').once('value')
+  .then(snap => { const val = snap.val();
+    regularList = Object.entries(val)
+      .filter(([name, role]) => role === "regular")
+      .map(([name]) => name);});
+
+const leavePromise = db.ref('leave').once('value')
+  .then(snap => Object.assign(leaveDatesMap, snap.val() || {}));
+
+const nightPromise = db.ref('nightShift').once('value')
+  .then(snap => Object.assign(nightShiftMap, snap.val() || {}));
+
+// ─── 모두 불러온 뒤 UI 렌더링 ────────────────────────────────
+    Promise.all([empPromise, regPromise, leavePromise, nightPromise])
+  .then(() => {
+    // 1) 계약직 목록: employees 중 regularList에 없는 사람
+    contractList = employees.filter(n => !regularList.includes(n));
+
+    // 2) 메인 화면 버튼 생성
+    const regEl = document.getElementById('regular');
+    const conEl = document.getElementById('contract');
+    regEl.innerHTML = ''; conEl.innerHTML = '';
+
+    regularList.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'name-btn';
+      btn.textContent = name;
+      btn.onclick = () => openCheck(name);
+      regEl.appendChild(btn);
+    });
+    contractList.forEach(name => {
+      const btn = document.createElement('button');
+      btn.className = 'name-btn';
+      btn.textContent = name;
+      btn.onclick = () => openCheck(name);
+      conEl.appendChild(btn);
+    });
+
+    // 4) 오늘 통계
+    renderTodayStat();
+  })
+  .catch(err => console.error('데이터 로드 에러:', err));
+
+
+  //renderemployeelist
+function renderEmployeeList() {
+  const ul = document.getElementById("employeeList");
+  ul.innerHTML = '';
+
+  // 1) 직원이 하나도 없으면 메시지
+  if (employees.length === 0) {
+    ul.innerHTML = '<li style="color:gray">등록된 직원이 없습니다.</li>';
+    return;
+  }
+
+  // 2) 그룹 헤더 및 서브 UL 생성
+  // 일반직
+  const regGroupLi = document.createElement('li');
+  regGroupLi.innerHTML = '<strong>일반직</strong>';
+  const regSubUl = document.createElement('ul');
+  regGroupLi.appendChild(regSubUl);
+  ul.appendChild(regGroupLi);
+
+  // 기간제
+  const conGroupLi = document.createElement('li');
+  conGroupLi.innerHTML = '<strong>기간제</strong>';
+  const conSubUl = document.createElement('ul');
+  conGroupLi.appendChild(conSubUl);
+  ul.appendChild(conGroupLi);
+
+  // 3) employees 배열 순회하면서 addRow 호출
+  employees.forEach(name => {
+    const isRegular = regularList.includes(name);
+    addRow(name, isRegular ? regSubUl : conSubUl);
+  });
+}
+
 
     // 오늘 통계 렌더
-    function renderTodayStat() {
+function renderTodayStat() {
       db.ref('mealLogs').once('value').then(snap => {
         const data = snap.val()||{};
         let count = 0;
         const isMon = new Date(todayISO).getDay()===1;
-        names.forEach(n => {
-          if (isMon && contract.includes(n)) return;
+        employees.forEach(n => {
+          if (isMon && contractList.includes(n)) return;
            const v = data[n]?.[todayISO];
       if (v !== 'X') count++;
         });
@@ -110,7 +180,7 @@
     }
 
     // 공휴일 API 호출
-    async function getKoreanHolidays(y, m) {
+async function getKoreanHolidays(y, m) {
       const rawKey = 'dtZOAdfRz5FEy2NGFBIEaHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
       const serviceKey = encodeURIComponent(rawKey);
       const mm = String(m).padStart(2, '0');
@@ -142,7 +212,7 @@
     }
 
     // 월 옵션 렌더
-    function renderMonthOptions() {
+function renderMonthOptions() {
       const sel = document.getElementById('monthSelect'); sel.innerHTML = '';
       for (let m = 0; m < 12; m++) {
         const opt = document.createElement('option'); opt.value = m; opt.textContent = `${m+1}월`;
@@ -153,13 +223,13 @@
     }
 
     // 상세 뷰 오픈
-    function openCheck(name) {
+function openCheck(name) {
       currentName = name;
       document.getElementById('main').style.display = 'none';
       document.getElementById('check').style.display = 'flex';
       renderMonthOptions();
       renderDates(name, thisMonth);
-    }
+     }
     
 async function generateWorkdaysForMonth(y, m) {
     const holidays = await getKoreanHolidays(y, m + 1);
@@ -179,21 +249,21 @@ async function generateWorkdaysForMonth(y, m) {
   }
 
     // 날짜별 O/X 렌더
-  async function renderDates(name, month) {
+async function renderDates(name, month) {
   console.log('▶ renderDates 호출:', name, month);
 
   try {
     // 1) selectedName 요소 체크
     const selEl = document.getElementById('selectedName');
-    console.log('  ▶ #selectedName:', selEl);
-    if (!selEl) throw new Error('#selectedName 요소를 찾을 수 없습니다.');
+    console.log('  ▶ //selectedName:', selEl);
+    if (!selEl) throw new Error('//selectedName 요소를 찾을 수 없습니다.');
 
     selEl.textContent = `${name} - ${thisYear}년 ${month+1}월`;
 
     // 2) dates 컨테이너 체크
     const cont = document.getElementById('dates');
-    console.log('  ▶ #dates 컨테이너:', cont);
-    if (!cont) throw new Error('#dates 요소를 찾을 수 없습니다.');
+    console.log('  ▶ //dates 컨테이너:', cont);
+    if (!cont) throw new Error('//dates 요소를 찾을 수 없습니다.');
 
     // 3) DB에서 기존값 가져오기
     const snap = await db.ref(`mealLogs/${name}`).once('value');
@@ -207,39 +277,37 @@ async function generateWorkdaysForMonth(y, m) {
     // 5) 렌더링
     cont.innerHTML = '';
     days.forEach(date => {
-      if (contract.includes(name) && new Date(date).getDay() === 1)     values[date] = 'X';
-if (leaveDatesMap[name] && leaveDatesMap[name][date])values[date] = 'X';
-if (nightOffList.includes(name) && nightShiftMap[name]&&nightShiftMap[name][date]) values[date] = 'X';
-       if (new Date(date) < new Date(todayISO) && values[date] === undefined) values[date] = 'X';
+      if (contractList.includes(name) && new Date(date).getDay() === 1)     values[date] = 'X';
+      if (leaveDatesMap[name] && leaveDatesMap[name][date])values[date] = 'X';
+      if (nightOffList.includes(name) && nightShiftMap[name]&&nightShiftMap[name][date]) values[date] = 'X';
+      if (new Date(date) < new Date(todayISO) && values[date] === undefined) values[date] = 'X';
       const row = document.createElement('div');
       row.className = 'date-row';
       if (date === todayISO) row.classList.add('today-highlight');
       const lbl = document.createElement('span'); lbl.textContent = `${date}: `;
-        const btnO = document.createElement('button'); btnO.textContent = 'O'; btnO.className = 'ox-btn';
-        const btnX = document.createElement('button'); btnX.textContent = 'X'; btnX.className = 'ox-btn';
-        if (values[date] === 'O') btnO.classList.add('selected');
-        if (values[date] === 'X') btnX.classList.add('selected');
-        btnO.onclick = () => { values[date] = 'O'; btnO.classList.add('selected'); btnX.classList.remove('selected'); };
-        btnX.onclick = () => { values[date] = 'X'; btnX.classList.add('selected'); btnO.classList.remove('selected'); };
-        row.append(lbl, btnO, btnX); 
+      const btnO = document.createElement('button'); btnO.textContent = 'O'; btnO.className = 'ox-btn';
+      const btnX = document.createElement('button'); btnX.textContent = 'X'; btnX.className = 'ox-btn';
+      if (values[date] === 'O') btnO.classList.add('selected');
+      if (values[date] === 'X') btnX.classList.add('selected');
+      btnO.onclick = () => { values[date] = 'O'; btnO.classList.add('selected'); btnX.classList.remove('selected'); };
+      btnX.onclick = () => { values[date] = 'X'; btnX.classList.add('selected'); btnO.classList.remove('selected'); };
+      row.append(lbl, btnO, btnX); 
       cont.appendChild(row);
     }); console.log('✅ renderDates 완료');
   } catch (err) {
     console.error('❌ renderDates 중 에러:', err);
-  }
+  }    }
 
-    }
-
-    function goBack() {
+function goBack() {
       document.getElementById('check').style.display = 'none';
       document.getElementById('main').style.display = 'flex';
     }
 
-    function saveMealLog() {
+function saveMealLog() {
       db.ref(`mealLogs/${currentName}`).update(values)
         .then(() => { alert('저장되었습니다'); goBack(); })
         .catch(err => console.error('saveMealLog error:', err));
     }
-  </script>
+ </script>   
 </body>
 </html>
