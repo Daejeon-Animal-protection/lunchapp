@@ -13,18 +13,18 @@
     th, td { border: 1px solid #ccc; padding: 8px; text-align: center; font-size: 12px; }
     th { background-color: #eee; }
     .highlight { font-weight: bold; }
-    .small-btn { font-size: 10px; margin-left: 4px; }
+    .small-btn { font-size: 10px; margin-left: 4px;text-align: center; }
     .expense-input { width: 80px; }
     #estimateDetails { display: none; text-align: left; max-width: 600px; margin: 10px auto; font-size: 12px; }
  .group-header { background-color: #ccc;font-weight: bold; font-size: 14px; text-align: center; }
-  </style>
+    #employeeList {  display: flex;  flex-direction: column;   align-items: center;   list-style: none;  padding: 0;  margin: 0 auto;}  </style>
 </head>
 <body>
   <div>
       <button id="btnStats">📊 개인별 식사 통계</button>
     <button id="btnExpenses">📋 식당운영비관리</button>
     <button id="btnCharges">💰 식대 징수</button>
-    <button id="btnSettings"⚙️ 설정</button>
+    <button id="btnSettings">⚙️ 설정</button>
   </div>
 
     <!-- 개인별 식사 통계 섹션 -->
@@ -70,6 +70,7 @@
     <div id="employeeSettings" style="display:none;">
       <input id="newEmployee" placeholder="직원이름 입력"/>
       <button id="addEmployeeBtn">➕ 추가</button>
+      <button id="saveAllBtn">💾 저장</button>
       <ul id="employeeList"></ul>
     </div>
   </div>
@@ -86,13 +87,29 @@
     const db = firebase.database();
     let employees = [];
     let regularList = ["이영일","이현승","김성동","박병삼","김하은","김미지","한수진","김혜경","임정아"];
-const expenseData = [
+    const expenseData = [
     { month:'2025-01', income:265000, expense:404650 },
     { month:'2025-02', income:1170000, expense:1212510 },
     { month:'2025-03', income:1170000, expense:1171310 },
     { month:'2025-04', income:1905000, expense:1656100 }
   ];
 
+     const historicalMonthlyAverages = {
+  '2024-04': { 월:14.8,   화:17.75,  수:19.25,  목:19.75,  금:10.5   },
+  '2024-05': { 월:6.6667, 화:14.25,  수:17.25,  목:19.75,  금:17     },
+  '2024-06': { 월:6.75,   화:18.5,   수:18.75,  목:19.3333,금:14.3333},
+  '2024-07': { 월:6,      화:19.5,   수:18.75,  목:19.5,   금:15.3333},
+  '2024-08': { 월:7,      화:19.75,  수:17.6667,목:19,     금:17.25  },
+  '2024-09': { 월:10.6667,화:19,     수:19.6667,목:20,     금:20.3333},
+  '2024-10': { 월:7,      화:13.3333,수:16,     목:14.3333,금:12.5   },
+  '2024-11': { 월:10.75,  화:18.25,  수:16,     목:18.3333,금:14.25  },
+  '2024-12': { 월:9.2,    화:17,     수:14.3333,목:17.75,  금:16     },
+  '2025-01': { 월:7,      화:15,     수:14,     목:12,     금:10     },
+  '2025-02': { 월:5.75,   화:11,     수:13,     목:13.75,  금:14     },
+  '2025-03': { 월:10.25,  화:13,     수:13.25,  목:14,     금:8.25   },
+  '2025-04': { 월:7.25,   화:20.5,   수:20.25,  목:19.75,  금:19.25  }
+};
+    
     //월선택
    function initMonthOptions(id) {
         const sel = document.getElementById(id);
@@ -113,7 +130,7 @@ const expenseData = [
     if (sec) sec.style.display='block';
   }
 
-    async function getKoreanHolidays(y, m) {
+async function getKoreanHolidays(y, m) {
       const rawKey = 'dtZOAdfRz5FEy2NGFBIEaHoQhfimWGWodsA2Wzcr+eSSdv1nDcyXk9REdGCzZuZPp32hkYvNFgHJJBeOhQ6H0g==';
       const serviceKey = encodeURIComponent(rawKey);
       const mm = String(m).padStart(2, '0');
@@ -143,8 +160,7 @@ const expenseData = [
         });
       }
     }
-
-  async function generateWorkdaysForMonth(y,m) {
+async function generateWorkdaysForMonth(y,m) {
  const holidays = await getKoreanHolidays(y, m);
     const days=[];
     const total=new Date(y,m,0).getDate();
@@ -215,7 +231,7 @@ async function renderStatsTable() {
 }
 
     //식대징수 기능
-     function renderChargeTable() {
+function renderChargeTable() {
   const sel   = document.getElementById('monthSelectCharges').value;
   const tbody = document.getElementById('chargeTableBody');
   tbody.innerHTML = '';
@@ -279,7 +295,7 @@ async function renderStatsTable() {
   });
 }
 
-
+//직원목록
 function renderEmployeeList() {
   const ul = document.getElementById("employeeList");
   ul.innerHTML = '';
@@ -320,7 +336,7 @@ function addRow(name, parentUl) {
   const input = document.createElement('input');
   input.type = 'text';
   input.value = name;
-  input.disabled = true;
+  input.disabled = false;
   input.style.flex = '0 0 120px';
   li.appendChild(input);
 
@@ -340,17 +356,6 @@ function addRow(name, parentUl) {
   makeBtn('✏️', () => {
     input.disabled = false;
     input.focus();
-  });
-
-  // 📂 저장
-  makeBtn('📂', () => {
-    const nv = input.value.trim();
-    if (nv && nv !== name) {
-      const idx = employees.indexOf(name);
-      employees[idx] = nv;
-      db.ref('employees').set(employees);
-      renderEmployeeList();
-    }
   });
 
   // 🔼 위로
@@ -375,17 +380,18 @@ function addRow(name, parentUl) {
 
   // ↔️ 직군 이동
   makeBtn(
-    regularList.includes(name) ? '➡️ 기간제' : '⬅️ 일반직',
-    () => {
-      if (regularList.includes(name)) {
-        regularList = regularList.filter(n => n !== name);
-      } else {
-        regularList.push(name);
-      }
-      db.ref('employees').set(employees);
-      renderEmployeeList();
+  regularList.includes(name) ? '➡️ 기간제' : '⬅️ 일반직',
+  () => {
+    if (regularList.includes(name)) {
+      regularList = regularList.filter(n => n !== name);
+      db.ref('employeeRoles/' + name).set('contract');
+    } else {
+      regularList.push(name);
+      db.ref('employeeRoles/' + name).set('regular');
     }
-  );
+    renderEmployeeList();
+  }
+);
 
   // ❌ 삭제
   makeBtn('❌', () => {
@@ -399,7 +405,7 @@ function addRow(name, parentUl) {
   parentUl.appendChild(li);
 }
 
-     function addEmployee() {
+function addEmployee() {
     const input = document.getElementById('newEmployee');
     const name = input.value.trim();
     if (name && !employees.includes(name)) {
@@ -412,83 +418,371 @@ function addRow(name, parentUl) {
   }
 
 //식당운영비관리
-    function renderExpenseTable() {
-  const tbody = document.getElementById('expenseTableBody');
-  tbody.innerHTML = '';
-  renderChargeTable().then(totalIncome => {
-    expenseData.forEach((it, i) => {
-      const diff = totalIncome - it.expense;
-      const tr   = document.createElement('tr');
+async function renderExpenseTable() {
+    const tbody = document.getElementById('expenseTableBody');
+    tbody.innerHTML = '';
+       expenseData.forEach((it, i) => {
+        const diff = it.income - it.expense;
+        const tr   = document.createElement('tr');
+  
+        tr.innerHTML =
+          `<td>${it.month}</td>` +
+          `<td>${it.income.toLocaleString()}</td>` +
+          `<td><span class="expense-value">${it.expense.toLocaleString()}</span> ` +
+            `<button class="small-btn edit-expense">✏️</button></td>` +
+          `<td class="highlight">${diff.toLocaleString()}</td>` +
+          `<td><button class="small-btn delete-expense">❌</button></td>`;
+        tr.querySelector('.edit-expense').addEventListener('click', () => {
+          const span = tr.querySelector('.expense-value');
+          const oldVal = span.textContent.replace(/,/g, '');
+          const input = document.createElement('input'); input.type = 'number'; input.value = oldVal; input.classList.add('expense-input');
+          span.replaceWith(input); input.focus();
+          input.onblur = () => { it.expense = parseInt(input.value) || 0; renderExpenseTable(); };
+        });
+        tr.querySelector('.delete-expense').addEventListener('click', () => { expenseData.splice(i, 1); renderExpenseTable(); });
+         tbody.appendChild(tr);
+      });
+  
+    await updateEstimate();
+  }
 
-      tr.innerHTML =
-        `<td>${it.month}</td>` +
-        `<td>${totalIncome.toLocaleString()}</td>` +
-        `<td><span class="expense-value">${it.expense.toLocaleString()}</span> ` +
-          `<button class="small-btn edit-expense">✏️</button></td>` +
-        `<td class="highlight">${diff.toLocaleString()}</td>` +
-        `<td><button class="small-btn delete-expense">❌</button></td>`;
-      tr.querySelector('.edit-expense').onclick = () => {
-        const span = tr.querySelector('.expense-value');
-        const oldVal = span.textContent.replace(/,/g, '');
-        const input = document.createElement('input'); input.type = 'number'; input.value = oldVal; input.classList.add('expense-input');
-        span.replaceWith(input); input.focus();
-        input.onblur = () => { it.expense = parseInt(input.value) || 0; renderExpenseTable(); };
-      };
-      tr.querySelector('.delete-expense').onclick = () => { expenseData.splice(i, 1); renderExpenseTable(); };
-       tbody.appendChild(tr);
+async function getMonthlyAverageByWeekday(year, month) {
+    const snap = await db.ref('mealLogs').once('value');
+    const data = snap.val() || {};
+    const wk = ['일','월','화','수','목','금','토'];
+    const countO = { '월':0, '화':0, '수':0, '목':0, '금':0 };
+    const countDays = { '월':0, '화':0, '수':0, '목':0, '금':0 };
+    const daysInMonth = new Date(year, month, 0).getDate();
+    const holidays = await getKoreanHolidays(year, month);
+
+    // 1) 평일일수 카운트
+    for (let d = 1; d <= daysInMonth; d++) {
+      const ds = `${year}-${String(month).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const dow = new Date(`${ds}T00:00:00+09:00`).getDay();
+      const day = wk[dow];
+      if (countDays[day] !== undefined && !holidays.includes(ds)) {
+        countDays[day]++;
+      }
+    }
+
+    // 2) 해당 월의 O 체크 건수 집계
+    Object.values(data).forEach(days => {
+      Object.entries(days).forEach(([date, v]) => {
+        if (date.startsWith(`${year}-${String(month).padStart(2,'0')}`) 
+            && String(v).toUpperCase() === 'O') {
+          const dow = new Date(`${date}T00:00:00+09:00`).getDay();
+          const day = wk[dow];
+          if (countO[day] !== undefined) countO[day]++;
+        }
+      });
     });
 
-    updateEstimate();
-  })
-  .catch(err => console.error(err));
-}
-
-  //예상지출액
-    async function updateEstimate() {
-    const sel = document.getElementById('monthSelect').value;
-    const [y, m] = sel.split('-').map(Number);
-const days = new Date(y, m, 0).getDate(); 
-    const wk = ['일','월','화','수','목','금','토'];
-    const cnt = { '월':0, '화':0, '수':0, '목':0, '금':0 };
-   const holidays = await getKoreanHolidays(y, m);
-if (cnt[w] !== undefined && !holidays.includes(ds)) cnt[w]++;
-    const avg = { summer:{'월':8.49,'화':17.33,'수':17.94,'목':18.95,'금':15.66}, winter:{'월':7.28,'화':13.83,'수':14.81,'목':15.26,'금':13.5} };
-    const season = (m >= 4 && m <= 9) ? 'summer' : 'winter';
-    const cost = 4500;
-    let est = 0;
-    Object.entries(cnt).forEach(([d, c]) => { est += avg[season][d] * c * cost; });
-    document.getElementById('nextMonthEstimate').textContent = `${sel} 예상 지출액: ${Math.round(est).toLocaleString()}원`;
-    const expr = Object.entries(cnt).map(([d, c]) => `(${d}:${c}일×${avg[season][d]}명×${cost}원)`).join(' + ');
-    document.getElementById('estimateDetails').innerHTML = `<strong>계산 근거:</strong><br><em>평균×평일×인당 ${cost.toLocaleString()}원</em><br><strong>계산식:</strong>${expr} = ${Math.round(est).toLocaleString()}원`;
+    // 3) 평균 계산
+    const result = {};
+    ['월','화','수','목','금'].forEach(day => {
+      const daysCnt = countDays[day] || 1;
+      result[day] = +(countO[day] / daysCnt).toFixed(2);
+    });
+    return result;
   }
-function getChargeTotal() {
-  return expenseData
-    .reduce((sum, item) => {
-      // item.expense가 문자열일 수 있으니 숫자로 변환
-      const val = typeof item.expense === 'number'
-        ? item.expense
-        : parseInt(item.expense.replace(/,/g,''), 10) || 0;
-      return sum + val;
-    }, 0);
-}
+    
+    //예상지출액
+async function getSeasonalAverageByWeekday() {
+    const mealSnap = await db.ref('mealLogs').once('value');
+    const data = mealSnap.val() || {};
   
+    const wk = ['일','월','화','수','목','금','토'];
+    const seasons = { summer: {}, winter: {} };
+    const counts  = { summer: {}, winter: {} };
+    const datesBySeason = { summer: new Set(), winter: new Set() };
+  
+    // 초기화
+    ['월','화','수','목','금'].forEach(day => {
+      seasons.summer[day] = 0;
+      seasons.winter[day] = 0;
+      counts.summer[day]  = 0;
+      counts.winter[day]  = 0;
+    });
+  
+    // ✅ O 카운트 + 날짜 수집
+    Object.entries(data).forEach(([name, days]) => {
+      Object.entries(days).forEach(([date, value]) => {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return;
+  
+        const [year, monthStr] = date.split('-');
+        const month = Number(monthStr);
+        const season = (month >= 4 && month <= 9) ? 'summer' : 'winter';
+  
+        datesBySeason[season].add(date);
+  
+        const dow = new Date(`${date}T00:00:00+09:00`).getDay();
+        const day = wk[dow];
+        if (seasons[season][day] === undefined) return;
+  
+        if (typeof value === 'string' && value.trim().toUpperCase() === 'O') {
+          seasons[season][day]++;
+        }
+      });
+    });
+  
+    // ✅ 시즌별 공휴일 목록 구성
+    const holidayMap = {}; // key: ${season}_${date} → true
+  
+    for (const season of ['summer', 'winter']) {
+      for (const date of datesBySeason[season]) {
+        const [y, m] = date.split('-').map(Number);
+        const hols = await getKoreanHolidays(y, m);
+        for (const h of hols) {
+          holidayMap[`${season}_${h}`] = true;
+        }
+      }
+    }
+  
+    // ✅ 평일 수 카운트
+    for (const season of ['summer', 'winter']) {
+      for (const date of datesBySeason[season]) {
+        if (holidayMap[`${season}_${date}`]) continue;
+        const dow = new Date(`${date}T00:00:00+09:00`).getDay();
+        const day = wk[dow];
+        if (counts[season][day] !== undefined) counts[season][day]++;
+      }
+    }
+  
+    // ✅ 최종 평균 계산
+    const result = { summer: {}, winter: {} };
+    for (const season of ['summer', 'winter']) {
+      for (const day of ['월','화','수','목','금']) {
+        const totalMeals = seasons[season][day] || 0;
+        const totalDays  = counts[season][day] || 1;
+        result[season][day] = +(totalMeals / totalDays).toFixed(2);
+      }
+    }
+  
+    console.log('📊 시즌별 평균 식사 인원:', result);
+    return result;
+  }
+  
+      
+      //예상지출액 계
+
+async function updateEstimate() {
+  const last = expenseData[expenseData.length - 1];
+  const [y, m] = last.month.split('-').map(Number);
+  const { ym, estimated, expr } = await calculateNextMonthEstimate(y, m);
+
+  // 1) nextMonthEstimate 엘리먼트 안전 조회
+  const nextEl = document.getElementById('nextMonthEstimate');
+  if (nextEl) {
+    nextEl.textContent = `${ym} 예상 지출액: ${estimated.toLocaleString()}원`;
+  } else {
+    console.error('#nextMonthEstimate 요소를 찾을 수 없습니다.');
+  }
+
+  // 2) estimateDetails 엘리먼트 안전 조회 및 innerHTML 업데이트
+  const detailEl = document.getElementById('estimateDetails');
+  if (detailEl) {
+    detailEl.innerHTML =
+      `<strong>계산 근거:</strong><br>` +
+      `<em>Firebase 데이터 기준 : 요일횟수×요일별 평균 식수인원×4500원 시즌 평균</em><br>` +
+      `<strong>계산식:</strong> ${expr} = ${estimated.toLocaleString()}원`;
+  } else {
+    console.error('#estimateDetails 요소를 찾을 수 없습니다.');
+  }
+ }
+
+ 
+  const wkDays = ['월','화','수','목','금'];
+
+async function calculateSeasonalAverageForForecast(baseYear, baseMonth) {
+  // 1) 계절 결정
+  const season = (baseMonth >= 4 && baseMonth <= 9) ? 'summer' : 'winter';
+
+  // 2) 히스토리컬 키 필터링
+  const histKeys = Object.keys(historicalMonthlyAverages || {})
+    .filter(key => {
+      const parts = key.split('-');
+      if (parts.length !== 2) return false;
+      const m = parseInt(parts[1], 10);
+      if (Number.isNaN(m)) return false;
+      const keySeason = (m >= 4 && m <= 9) ? 'summer' : 'winter';
+      return keySeason === season;
+    });
+
+  // 3) 합산 초기화
+  const sumAvg = wkDays.reduce((acc, d) => ({ ...acc, [d]: 0 }), {});
+
+  // 4) 과거 데이터 합산
+  histKeys.forEach(key => {
+    const ma = historicalMonthlyAverages[key] || {};
+    wkDays.forEach(d => {
+      const v = ma[d];
+      sumAvg[d] += (v != null ? v : 0);
+    });
+  });
+
+  // 5) 이번 달 동적 평균 추가
+  const dynamicAvg = await getMonthlyAverageByWeekday(baseYear, baseMonth) || {};
+  wkDays.forEach(d => {
+    sumAvg[d] += (dynamicAvg[d] != null ? dynamicAvg[d] : 0);
+  });
+
+  // 6) 개월 수 계산 및 평균
+  const totalMonths = histKeys.length + 1;  // histKeys.length가 0 이상임을 전제
+  const result = Object.fromEntries(
+    wkDays.map(d => [d, +(sumAvg[d] / totalMonths).toFixed(2)])
+  );
+
+  return result;
+}
 
 
-     document.addEventListener('DOMContentLoaded', () => {
- initMonthOptions('monthSelectStats');
-    initMonthOptions('monthSelectExpenses');
-    initMonthOptions('monthSelectCharges');
-    db.ref('employees').on('value', snap => { employees = snap.val() || []; renderEmployeeList(); });
- document.getElementById('monthSelectStats')
-          .addEventListener('change', renderStatsTable);
-    document.getElementById('btnStats').onclick = () => { showSection('stats'); renderStatsTable(); };
-    document.getElementById('btnExpenses').onclick = () => { showSection('expenses'); renderExpenseTable(); };
-    document.getElementById('btnCharges').onclick = () => { showSection('charges'); renderChargeTable(); };
-    document.getElementById('btnSettings').onclick = () => { showSection('settings'); };
-    document.getElementById('btnEmployees').onclick = () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; };
-    document.getElementById('addEmployeeBtn').onclick = addEmployee;
-    document.getElementById('addExpenseRow').onclick = () => { const m = document.getElementById('monthSelect').value; if (!expenseData.some(e=>e.month===m)) expenseData.push({month:m, income:getChargeTotal(), expense:0}); renderExpenseTable(); };
-    document.getElementById('toggleEstimate').onclick = () => { const d = document.getElementById('estimateDetails'); d.style.display = d.style.display==='none'?'block':'none'; };
+async function calculateNextMonthEstimate(year, month) {
+   // 1) 다음 달 연월 계산
+  const nextMonth = month === 12 ? 1 : month + 1;
+  const nextYear  = month === 12 ? year + 1  : year;
+  const ym        = `${nextYear}-${String(nextMonth).padStart(2,'0')}`;
+
+  const weekdayValues = await calculateSeasonalAverageForForecast(year, month);
+
+  // 5) 다음 달 평일 일수 세고 금액 계산
+  const daysInNext = new Date(nextYear, nextMonth, 0).getDate();
+  const holidays   = await getKoreanHolidays(nextYear, nextMonth);
+  const wk         = ['일','월','화','수','목','금','토'];
+  const cnt        = { 월:0, 화:0, 수:0, 목:0, 금:0 };
+
+  for (let d = 1; d <= daysInNext; d++) {
+    const ds  = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const day = wk[new Date(`${ds}T00:00:00+09:00`).getDay()];
+    if (cnt[day] !== undefined && !holidays.includes(ds)) {
+      cnt[day]++;
+    }
+  }
+
+  // 4) 금액 계산 및 exprParts 생성
+  const cost      = 4500;
+  let estimated   = 0;
+  const exprParts = [];
+
+  ['월','화','수','목','금'].forEach(d => {
+    const daysCount = cnt[d];
+    const avg       = weekdayValues[d] || 0;
+    if (daysCount > 0) {
+      const part = `(${d}:${daysCount}일×${avg}명×${cost}원)`;
+      exprParts.push(part);
+      estimated += daysCount * avg * cost;
+    }
+  });
+
+  return {
+    ym,
+    estimated: Math.round(estimated),
+    expr: exprParts.join(' + ')
+  };
+}
+
+    
+        
+
+
+
+ document.addEventListener('DOMContentLoaded', () => {
+  ['monthSelectStats', 'monthSelect', 'monthSelectCharges'].forEach(id => { 
+    if (document.getElementById(id)) { initMonthOptions(id); } else {      console.warn(`${id} 요소 없음`);    }});
+  document.getElementById('addExpenseRow').addEventListener('click', async () => {
+    const last = expenseData[expenseData.length - 1];
+    const [y, m] = last.month.split('-').map(Number);
+    const { ym, estimated } = await calculateNextMonthEstimate(y, m);
+    const income = await renderChargeTable();
+    expenseData.push({ month: ym, income, expense: estimated });
+    await renderExpenseTable();
+    });
+  
+  document.getElementById('toggleEstimate').addEventListener('click', () => {
+    const detailEl = document.getElementById('estimateDetails');
+    if (!detailEl) {
+    console.warn('#estimateDetails 요소를 찾을 수 없습니다');
+    return;
+    }
+    if (detailEl.style.display === 'none') {
+    detailEl.style.display = 'block';
+    } else {
+    detailEl.style.display = 'none';
+    }
+    });
+      Promise.all([
+    db.ref('employees').once('value'),
+    db.ref('employeeRoles').once('value')
+    ]).then(([empSnap, roleSnap]) => {
+    employees = empSnap.val() || [];
+    employeeRoles = roleSnap.val() || {};
+    regularList = employees.filter(n => employeeRoles[n] === 'regular');
+    renderEmployeeList();
+    });
+
+      // 💾 저장 버튼 이벤트 등록
+  document.getElementById('saveAllBtn').addEventListener('click', () => {
+    const newEmployees = [];
+    const newRoles = {};
+
+    // input 요소 순회하며 이름 수집
+    document.querySelectorAll('#employeeList input').forEach(input => {
+      const name = input.value.trim();
+      if (name) newEmployees.push(name);
+    });
+
+    // 이름별로 소속 그룹 판별하여 역할 저장
+    newEmployees.forEach(name => {
+      const inputEl = Array.from(document.querySelectorAll('#employeeList input'))
+        .find(i => i.value.trim() === name);
+      const isRegular = inputEl?.closest('ul') === document.querySelector('#employeeList ul:nth-of-type(1)');
+      newRoles[name] = isRegular ? 'regular' : 'contract';
+    });
+
+    // 업데이트
+    employees = newEmployees;
+    employeeRoles = newRoles;
+
+    // Firebase 저장
+    db.ref('employees').set(employees);
+    db.ref('employeeRoles').set(employeeRoles);
+
+  
+      showToast('모든 변경사항이 저장되었습니다!');
+
+        renderEmployeeList();
+    });
+  
+    //저장메세지
+function showToast(msg) {
+  let toast = document.getElementById('toastMsg');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'toastMsg';
+    toast.style.position = 'fixed';
+    toast.style.bottom = '20px';
+    toast.style.left = '50%';
+    toast.style.transform = 'translateX(-50%)';
+    toast.style.background = '#333';
+    toast.style.color = '#fff';
+    toast.style.padding = '12px 20px';
+    toast.style.borderRadius = '8px';
+    toast.style.zIndex = '1000';
+    document.body.appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.style.opacity = '1';
+  setTimeout(() => toast.style.opacity = '0', 2000);
+}
+
+  db.ref('employees').on('value', snap => { employees = snap.val() || []; renderEmployeeList(); });
+  document.getElementById('monthSelectStats').addEventListener('change', renderStatsTable);
+  document.getElementById('monthSelect')?.addEventListener('change', renderExpenseTable);
+  document.getElementById('monthSelectCharges')?.addEventListener('change', renderChargeTable);
+  document.getElementById('btnStats').addEventListener('click', () => { showSection('stats'); renderStatsTable(); });
+  document.getElementById('btnExpenses').addEventListener('click', () => { showSection('expenses'); renderExpenseTable(); });
+  document.getElementById('btnCharges').addEventListener('click', () => { showSection('charges'); renderChargeTable(); });
+  document.getElementById('btnSettings').addEventListener('click', () => { showSection('settings'); });
+  document.getElementById('btnEmployees').addEventListener('click', () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; });  document.getElementById('addEmployeeBtn').addEventListener('click', addEmployee);
     showSection('stats');
   });
 
