@@ -44,7 +44,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 <script>
    
-    const firebaseConfig = {
+ const firebaseConfig = {
       apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
       authDomain: "lunch-20bb8.firebaseapp.com",
       databaseURL: "https://lunch-20bb8-default-rtdb.firebaseio.com",
@@ -54,8 +54,8 @@
       appId: "1:218925939220:web:4b8940a954f05bfb4a0501" };
       
     // 전역 변수
-    let currentName = '';
-    let values = {};
+let currentName = '';
+let values = {};
 
   // ─── Firebase 초기화 ───────────────────────────────────────
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
@@ -84,13 +84,18 @@ const nightShiftMap  = {};
 
 // ─── 데이터 불러오기 Promise ────────────────────────────────
 const empPromise = db.ref('employees').once('value')
-  .then(snap => { employees = snap.val() || []; });
+  .then(snap => {
+    const val = snap.val();
+    if (Array.isArray(val)) {
+      employees = val;           // DB에 저장된 배열 순서 그대로
+    } else {
+      employees = Object.values(val || {}); 
+    }
+  });
+
 
 const regPromise = db.ref('employeeRoles').once('value')
-  .then(snap => { const val = snap.val();
-    regularList = Object.entries(val)
-      .filter(([name, role]) => role === "regular")
-      .map(([name]) => name);});
+  .then(snap => {   window.roleMap = snap.val() || {};});
 
 const leavePromise = db.ref('leave').once('value')
   .then(snap => Object.assign(leaveDatesMap, snap.val() || {}));
@@ -99,10 +104,18 @@ const nightPromise = db.ref('nightShift').once('value')
   .then(snap => Object.assign(nightShiftMap, snap.val() || {}));
 
 // ─── 모두 불러온 뒤 UI 렌더링 ────────────────────────────────
-    Promise.all([empPromise, regPromise, leavePromise, nightPromise])
+Promise.all([empPromise, regPromise, leavePromise, nightPromise])
   .then(() => {
     // 1) 계약직 목록: employees 중 regularList에 없는 사람
-    contractList = employees.filter(n => !regularList.includes(n));
+    regularList  = [];
+    contractList = [];
+    employees.forEach(name => {
+      if (window.roleMap[name] === "regular") {
+        regularList.push(name);
+      } else {
+        contractList.push(name);
+      }
+    });
 
     // 2) 메인 화면 버튼 생성
     const regEl = document.getElementById('regular');
