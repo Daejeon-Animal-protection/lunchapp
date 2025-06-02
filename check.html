@@ -61,12 +61,16 @@ let values = {};
 if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// ─── 제외할 야간조(휴식) 목록 ───────────────────────────────
-const nightOffList = [
-  "연경순","임경순","최승필","홍선주","석순옥","이창례","임주연","김미영",
-  "심장식","손영복","손영부","강성필","오화진"
-];
+//야간조제외대상 불러오기기
+const nightShiftExceptions = [];  // 새로 저장할 목록
 
+const nightExceptionPromise = db.ref('nightShiftExceptions').once('value')
+  .then(snap => {
+    const val = snap.val();
+    if (Array.isArray(val)) nightShiftExceptions.push(...val);
+    else if (typeof val === 'object' && val !== null) nightShiftExceptions.push(...Object.keys(val));
+    else console.warn('nightShiftExceptions 형식 오류:', val);
+  });
 // ─── 오늘 날짜 (한국시간) ────────────────────────────────────
 const today = new Date();
 today.setHours(today.getHours() + 9);
@@ -104,7 +108,7 @@ const nightPromise = db.ref('nightShift').once('value')
   .then(snap => Object.assign(nightShiftMap, snap.val() || {}));
 
 // ─── 모두 불러온 뒤 UI 렌더링 ────────────────────────────────
-Promise.all([empPromise, regPromise, leavePromise, nightPromise])
+Promise.all([empPromise, regPromise, leavePromise, nightPromise, nightExceptionPromise])
   .then(() => {
     // 1) 계약직 목록: employees 중 regularList에 없는 사람
     regularList  = [];
@@ -292,7 +296,7 @@ async function renderDates(name, month) {
     days.forEach(date => {
       if (contractList.includes(name) && new Date(date).getDay() === 1)     values[date] = 'X';
       if (leaveDatesMap[name] && leaveDatesMap[name][date])values[date] = 'X';
-      if (nightOffList.includes(name) && nightShiftMap[name]&&nightShiftMap[name][date]) values[date] = 'X';
+      if (nightShiftExceptions.includes(name) && nightShiftMap[name]&&nightShiftMap[name][date]) values[date] = 'X';
       if (new Date(date) < new Date(todayISO) && values[date] === undefined) values[date] = 'X';
       const row = document.createElement('div');
       row.className = 'date-row';
