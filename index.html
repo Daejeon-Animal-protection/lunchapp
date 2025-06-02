@@ -16,8 +16,19 @@
     .small-btn { font-size: 10px; margin-left: 4px;text-align: center; }
     .expense-input { width: 80px; }
     #estimateDetails { display: none; text-align: left; max-width: 600px; margin: 10px auto; font-size: 12px; }
- .group-header { background-color: #ccc;font-weight: bold; font-size: 14px; text-align: center; }
-    #employeeList {  display: flex;  flex-direction: column;   align-items: center;   list-style: none;  padding: 0;  margin: 0 auto;}  </style>
+    .group-header { background-color: #ccc;font-weight: bold; font-size: 14px; text-align: center; }
+    #employeeList {  display: flex;  flex-direction: column;   align-items: center;   list-style: none;  padding: 0;  margin: 0 auto;} 
+    #nightShiftSettings {  display: none;  margin-top: 16px;  border: 1px solid #ccc;  padding: 12px;  background: #fafafa;  }
+  #nightShiftSettings .header {    display: flex;    justify-content: space-between;    align-items: center;    margin-bottom: 8px;  }
+  #nightShiftSettings .header h2 {    margin: 0;    font-size: 18px;  }
+   #nightShiftSettings .inner {    display: flex;    align-items: center;    gap: 12px;  }
+  #nightShiftSettings .list-box {    flex: 1;    border: 1px solid #bbb;    padding: 8px;    min-height: 200px;  }
+  #nightShiftSettings .list-box h3 {    margin-top: 0;    font-size: 16px;    text-align: center;  }
+    #nightShiftSettings ul {    list-style: none;    padding: 0;    margin: 0;    max-height: 200px;    overflow: auto;  }
+  #nightShiftSettings ul li {    padding: 4px 8px;    cursor: pointer;  }
+    #nightShiftSettings ul li.selected {    background-color: #d1eaff;  }
+  #nightShiftSettings .move-buttons {    display: flex;    flex-direction: column;    gap: 8px;  }
+ </style>
 </head>
 <body>
   <div>
@@ -73,11 +84,32 @@
       <button id="saveAllBtn">💾 저장</button>
       <ul id="employeeList"></ul>
     </div>
+    <button id="btnNightShift">🌙 야간조관리</button>
+    <div id="nightShiftSettings">
+        <div class="header">
+        <h2>야간조 식사여부 관리</h2>
+        <button id="saveNightShiftBtn">💾 저장</button>
+    </div>
+    <div class="inner">
+        <div class="list-box">
+        <h3>야간조 중 식사하는 사람</h3>
+        <ul id="leftNightList"></ul>
+    </div>
+    <div class="move-buttons">
+        <button id="moveToRightBtn">➡️</button>
+        <button id="moveToLeftBtn">⬅️</button>
+    </div>
+    <div class="list-box">
+        <h3>야간조 중 식사 안하는 사람</h3>
+        <ul id="rightNightList"></ul>
+    </div>
+    </div>
+  </div>
   </div>
 
 
   <script>
-    // Firebase 초기화
+// Firebase 초기화
     firebase.initializeApp({
       apiKey: "AIzaSyD5TK7QNHXvQsjKNQ7136SxhP_lJ9PdbsM",
       authDomain: "lunch-20bb8.firebaseapp.com",
@@ -85,9 +117,11 @@
       projectId: "lunch-20bb8"
     });
     const db = firebase.database();
+    const expenseRef = db.ref('expenseData'); 
+
     let employees = [];
     let regularList = ["이영일","이현승","김성동","박병삼","김하은","김미지","한수진","김혜경","임정아"];
-    const expenseData = [
+    let expenseData = [
     { month:'2025-01', income:265000, expense:404650 },
     { month:'2025-02', income:1170000, expense:1212510 },
     { month:'2025-03', income:1170000, expense:1171310 },
@@ -110,7 +144,7 @@
   '2025-04': { 월:7.25,   화:20.5,   수:20.25,  목:19.75,  금:19.25  }
 };
     
-    //월선택
+//월선택
    function initMonthOptions(id) {
         const sel = document.getElementById(id);
         if (!sel) return;
@@ -230,7 +264,7 @@ async function renderStatsTable() {
   });
 }
 
-    //식대징수 기능
+//식대징수 기능
 function renderChargeTable() {
   const sel   = document.getElementById('monthSelectCharges').value;
   const tbody = document.getElementById('chargeTableBody');
@@ -437,9 +471,9 @@ async function renderExpenseTable() {
           const oldVal = span.textContent.replace(/,/g, '');
           const input = document.createElement('input'); input.type = 'number'; input.value = oldVal; input.classList.add('expense-input');
           span.replaceWith(input); input.focus();
-          input.onblur = () => { it.expense = parseInt(input.value) || 0; renderExpenseTable(); };
+          input.onblur = () => { it.expense = parseInt(input.value) || 0; saveExpenseDataToFirebase(); renderExpenseTable(); };
         });
-        tr.querySelector('.delete-expense').addEventListener('click', () => { expenseData.splice(i, 1); renderExpenseTable(); });
+        tr.querySelector('.delete-expense').addEventListener('click', () => { expenseData.splice(i, 1);saveExpenseDataToFirebase(); renderExpenseTable(); });
          tbody.appendChild(tr);
       });
   
@@ -485,8 +519,13 @@ async function getMonthlyAverageByWeekday(year, month) {
     });
     return result;
   }
-    
-    //예상지출액
+
+async function saveExpenseDataToFirebase() {
+  expenseRef.set(expenseData)
+    .catch(err => console.error('ExpenseData 저장 실패:', err));
+}
+
+//예상지출액
 async function getSeasonalAverageByWeekday() {
     const mealSnap = await db.ref('mealLogs').once('value');
     const data = mealSnap.val() || {};
@@ -561,9 +600,8 @@ async function getSeasonalAverageByWeekday() {
     console.log('📊 시즌별 평균 식사 인원:', result);
     return result;
   }
-  
-      
-      //예상지출액 계
+   
+//예상지출액 계
 
 async function updateEstimate() {
   const last = expenseData[expenseData.length - 1];
@@ -589,8 +627,6 @@ async function updateEstimate() {
     console.error('#estimateDetails 요소를 찾을 수 없습니다.');
   }
  }
-
- 
   const wkDays = ['월','화','수','목','금'];
 
 async function calculateSeasonalAverageForForecast(baseYear, baseMonth) {
@@ -634,7 +670,6 @@ async function calculateSeasonalAverageForForecast(baseYear, baseMonth) {
 
   return result;
 }
-
 
 async function calculateNextMonthEstimate(year, month) {
    // 1) 다음 달 연월 계산
@@ -680,12 +715,82 @@ async function calculateNextMonthEstimate(year, month) {
   };
 }
 
-    
-        
+//야간조관리
+async function loadNightShiftData() {
+  try {
+      const [empSnap, roleSnap, exclSnap] = await Promise.all([
+      db.ref('employees').once('value'),
+      db.ref('employeeRoles').once('value'),
+      db.ref('nightShiftExceptions').once('value') 
+    ]);
+    const allEmps = empSnap.val() || [];
+    const empRoles = roleSnap.val() || {};
+    const storedExceptions = exclSnap.val() || [];
+    const contractEmps = allEmps.filter(name => empRoles[name] === 'contract');
+    const leftUl = document.getElementById('leftNightList');
+    const rightUl = document.getElementById('rightNightList');
+    leftUl.innerHTML = '';
+    rightUl.innerHTML = '';
+    contractEmps.forEach(name => {
+      const li = document.createElement('li');
+      li.textContent = name;
+      li.style.padding = '4px 8px';
+      li.style.cursor = 'pointer';
+      li.addEventListener('click', () => {
+      li.classList.toggle('selected');
+      li.style.backgroundColor = li.classList.contains('selected') ? '#d1eaff' : '';
+      });
 
+      if (storedExceptions.includes(name)) {
+        rightUl.appendChild(li);
+      } else {
+        leftUl.appendChild(li);
+      }
+    });
+  } catch (err) {
+    console.error('loadNightShiftData error:', err);
+  }
+}
+function moveSelected(srcId, dstId) {
+  const srcUl = document.getElementById(srcId);
+  const dstUl = document.getElementById(dstId);
+  const selectedItems = Array.from(srcUl.querySelectorAll('li.selected'));
+  selectedItems.forEach(li => {
+    li.classList.remove('selected');
+    li.style.backgroundColor = '';
+    dstUl.appendChild(li);
+  });
+}
+async function saveNightShiftExceptions() {
+  try {
+    const rightUl = document.getElementById('rightNightList');
+    const namesArray = Array.from(rightUl.querySelectorAll('li')).map(li => li.textContent);
+    await db.ref('nightShiftExceptions').set(namesArray);
 
+    alert('✅ 야간조 제외 대상이 저장되었습니다.');
 
- document.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('nightShiftSettings').style.display = 'none';
+  } catch (err) {
+    console.error('saveNightShiftExceptions error:', err);
+    alert('⚠️ 저장 중 오류가 발생했습니다.');
+  }
+}
+
+ document.addEventListener('DOMContentLoaded', async () => {
+  try {
+      const snapshot = await expenseRef.once('value');
+      const firebaseData = snapshot.val();
+      if (Array.isArray(firebaseData)) {
+        expenseData = firebaseData;
+      } else if (firebaseData && typeof firebaseData === 'object') {
+        // 객체 형태일 때 배열로 변환
+        expenseData = Object.values(firebaseData);
+      }
+    } catch (err) {
+      console.error('Firebase에서 expenseData 불러오기 실패:', err);
+    }
+       await renderExpenseTable();
+
   ['monthSelectStats', 'monthSelect', 'monthSelectCharges'].forEach(id => { 
     if (document.getElementById(id)) { initMonthOptions(id); } else {      console.warn(`${id} 요소 없음`);    }});
   document.getElementById('addExpenseRow').addEventListener('click', async () => {
@@ -693,7 +798,7 @@ async function calculateNextMonthEstimate(year, month) {
     const [y, m] = last.month.split('-').map(Number);
     const { ym, estimated } = await calculateNextMonthEstimate(y, m);
     const income = await renderChargeTable();
-    expenseData.push({ month: ym, income, expense: estimated });
+    expenseData.push({ month: ym, income, expense: estimated }); saveExpenseDataToFirebase();
     await renderExpenseTable();
     });
   
@@ -720,37 +825,32 @@ async function calculateNextMonthEstimate(year, month) {
     });
 
       // 💾 저장 버튼 이벤트 등록
-  document.getElementById('saveAllBtn').addEventListener('click', () => {
-    const newEmployees = [];
-    const newRoles = {};
+      document.getElementById('saveAllBtn').addEventListener('click', () => {
+  const newEmployees = [];
+  const newRoles = {};
 
-    // input 요소 순회하며 이름 수집
-    document.querySelectorAll('#employeeList input').forEach(input => {
-      const name = input.value.trim();
-      if (name) newEmployees.push(name);
-    });
+  // 순서를 반영해 input 요소 순회
+  document.querySelectorAll('#employeeList li input').forEach(input => {
+    const name = input.value.trim();
+    if (name) {
+      newEmployees.push(name);
 
-    // 이름별로 소속 그룹 판별하여 역할 저장
-    newEmployees.forEach(name => {
-      const inputEl = Array.from(document.querySelectorAll('#employeeList input'))
-        .find(i => i.value.trim() === name);
-      const isRegular = inputEl?.closest('ul') === document.querySelector('#employeeList ul:nth-of-type(1)');
-      newRoles[name] = isRegular ? 'regular' : 'contract';
-    });
+      const group = input.closest('ul')?.previousElementSibling?.textContent;
+      newRoles[name] = group.includes('일반직') ? 'regular' : 'contract';
+    }
+  });
 
-    // 업데이트
-    employees = newEmployees;
-    employeeRoles = newRoles;
+  employees = newEmployees;
+  employeeRoles = newRoles;
 
-    // Firebase 저장
-    db.ref('employees').set(employees);
-    db.ref('employeeRoles').set(employeeRoles);
+  db.ref('employees').set(employees);
+  db.ref('employeeRoles').set(employeeRoles);
 
-  
-      showToast('모든 변경사항이 저장되었습니다!');
+  // 알림 대체용
+  showToast('💾 저장되었습니다.');
+  renderEmployeeList();
+});
 
-        renderEmployeeList();
-    });
   
     //저장메세지
 function showToast(msg) {
@@ -782,8 +882,15 @@ function showToast(msg) {
   document.getElementById('btnExpenses').addEventListener('click', () => { showSection('expenses'); renderExpenseTable(); });
   document.getElementById('btnCharges').addEventListener('click', () => { showSection('charges'); renderChargeTable(); });
   document.getElementById('btnSettings').addEventListener('click', () => { showSection('settings'); });
-  document.getElementById('btnEmployees').addEventListener('click', () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; });  document.getElementById('addEmployeeBtn').addEventListener('click', addEmployee);
-    showSection('stats');
+  document.getElementById('btnEmployees').addEventListener('click', () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; });  document.getElementById('addEmployeeBtn').addEventListener('click', addEmployee); showSection('stats');
+  document.getElementById('btnNightShift').addEventListener('click', () => {
+    const ns = document.getElementById('nightShiftSettings');
+    ns.style.display = (ns.style.display === 'none' || !ns.style.display) ? 'block' : 'none';
+    if (ns.style.display === 'block') {
+      loadNightShiftData();    }  });
+  document.getElementById('moveToRightBtn').addEventListener('click', () => moveSelected('leftNightList', 'rightNightList'));
+  document.getElementById('moveToLeftBtn').addEventListener('click', () => moveSelected('rightNightList', 'leftNightList'));
+  document.getElementById('saveNightShiftBtn').addEventListener('click', saveNightShiftExceptions);
   });
 
   </script>
