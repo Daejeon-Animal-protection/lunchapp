@@ -5,6 +5,7 @@
   <title>Lunch Check</title>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
   <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
      body { font-family: sans-serif; background: #f4f4f4; padding: 20px; text-align: center; }
     button { margin: 4px; padding: 8px 12px; }
@@ -28,6 +29,11 @@
   #nightShiftSettings ul li {    padding: 4px 8px;    cursor: pointer;  }
     #nightShiftSettings ul li.selected {    background-color: #d1eaff;  }
   #nightShiftSettings .move-buttons {    display: flex;    flex-direction: column;    gap: 8px;  }
+  .upload-box {  margin-top: 20px;  padding: 12px;  border: 1px solid #ccc;  background: #fafafa;  display: inline-block;  text-align: left;  font-size: 14px;}
+.upload-box input[type="file"] {  margin-bottom: 10px;}.upload-box button {  margin-left: 8px;  padding: 6px 12px;}
+.upload-log {  margin-top: 10px;  background: #f0f0f0;  padding: 10px;  white-space: pre-wrap;  min-height: 40px;}
+.toggle-buttons {  display: flex;  gap: 8px;  justify-content: center;  margin-bottom: 12px;}
+#employeeSettings,#nightShiftSettings,#excelUploadSection {  display: none;}
  </style>
 </head>
 <body>
@@ -77,24 +83,27 @@
   <!-- 설정 섹션 -->
   <div id="settings" class="section">
     <h1>⚙️ 설정</h1>
-    <button id="btnEmployees">👥 직원목록</button>
-    <div id="employeeSettings" style="display:none;">
+    <div class="toggle-buttons">
+      <button id="btnEmployees">👥 직원목록</button>
+      <button id="btnNightShift">🌙 야간조관리</button>
+      <button id="btnExcelUpload">📂 엑셀 업로드</button>
+      </div>
+     <div id="employeeSettings" style="display:none;">
       <input id="newEmployee" placeholder="직원이름 입력"/>
       <button id="addEmployeeBtn">➕ 추가</button>
       <button id="saveAllBtn">💾 저장</button>
       <ul id="employeeList"></ul>
-    </div>
-    <button id="btnNightShift">🌙 야간조관리</button>
+    </div> 
     <div id="nightShiftSettings">
         <div class="header">
         <h2>야간조 식사여부 관리</h2>
         <button id="saveNightShiftBtn">💾 저장</button>
-    </div>
-    <div class="inner">
+        </div>
+      <div class="inner">
         <div class="list-box">
         <h3>야간조 중 식사하는 사람</h3>
         <ul id="leftNightList"></ul>
-    </div>
+      </div>
     <div class="move-buttons">
         <button id="moveToRightBtn">➡️</button>
         <button id="moveToLeftBtn">⬅️</button>
@@ -104,7 +113,15 @@
         <ul id="rightNightList"></ul>
     </div>
     </div>
+     </div>
+     <div id="excelUploadSection" style="display:none;">
+  <h2>📂 엑셀 업로드 (휴무자/야간조)</h2>
+  <div class="upload-box">
+    <input type="file" id="fileInput" accept=".csv" />
+    <button id="uploadBtn">🚀 업로드</button>
+    <div id="uploadLog" class="upload-log"></div>
   </div>
+</div>
   </div>
 
 
@@ -776,15 +793,65 @@ async function saveNightShiftExceptions() {
   }
 }
 
- document.addEventListener('DOMContentLoaded', async () => {
+//휴무자,야간조 엑셀업로드
+let parsedData = null;
+let uploadFileName = '';
+
+async function uploadToFirebase() {
+  // 1) parsedData 검사
+  if (!parsedData || !Array.isArray(parsedData)) {
+    return logUpload("⚠️ 먼저 올바른 파일을 선택해주세요.");
+  }
+  // 2) fileName 검사
+  if (typeof uploadFileName !== 'string') {
+    return logUpload("⚠️ 파일명이 유효하지 않습니다.");
+  }
+
+  const lowerName = uploadFileName.toLowerCase();
+  let path = '';
+  if (lowerName.includes('leave')) path = 'leave';
+  else if (lowerName.includes('night')) path = 'nightShift';
+  else {
+    return logUpload('⚠️ 파일명에 "leave" 또는 "night"를 포함해야 합니다.');
+  }
+
+  // 3) 객체 생성
+  const obj = {};
+  parsedData.forEach(row => {
+    const rawName = row.이름 || row.name;
+    if (!rawName) return;
+    const name = String(rawName).trim();
+    if (!obj[name]) obj[name] = {};
+
+    Object.entries(row).forEach(([k, v]) => {
+      if ((k === '이름' || k === 'name') || v == null) return;
+      obj[name][k] = v;
+    });
+  });
+
+  try {
+    await  db.ref(path).set(obj);
+      logUpload(`🎉 "${path}" 업로드 완료`);
+       fileInput.value = '';
+      parsedData = null;
+      uploadFileName = '';
+    }    catch(err) {logUpload(`❌ 업로드 실패: ${err.message}`);
+}}
+
+
+function logUpload(msg) {
+  document.getElementById('uploadLog').textContent = msg;
+}
+
+//DOM
+document.addEventListener('DOMContentLoaded', async () => {
   try {
       const snapshot = await expenseRef.once('value');
       const firebaseData = snapshot.val();
       if (Array.isArray(firebaseData)) {
         expenseData = firebaseData;
       } else if (firebaseData && typeof firebaseData === 'object') {
-        // 객체 형태일 때 배열로 변환
-        expenseData = Object.values(firebaseData);
+          expenseData = Object.values(firebaseData);
       }
     } catch (err) {
       console.error('Firebase에서 expenseData 불러오기 실패:', err);
@@ -801,7 +868,6 @@ async function saveNightShiftExceptions() {
     expenseData.push({ month: ym, income, expense: estimated }); saveExpenseDataToFirebase();
     await renderExpenseTable();
     });
-  
   document.getElementById('toggleEstimate').addEventListener('click', () => {
     const detailEl = document.getElementById('estimateDetails');
     if (!detailEl) {
@@ -814,15 +880,15 @@ async function saveNightShiftExceptions() {
     detailEl.style.display = 'none';
     }
     });
-      Promise.all([
+    Promise.all([
     db.ref('employees').once('value'),
     db.ref('employeeRoles').once('value')
     ]).then(([empSnap, roleSnap]) => {
-    employees = empSnap.val() || [];
-    employeeRoles = roleSnap.val() || {};
-    regularList = employees.filter(n => employeeRoles[n] === 'regular');
-    renderEmployeeList();
-    });
+     employees = empSnap.val() || [];
+      employeeRoles = roleSnap.val() || {};
+      regularList = employees.filter(n => employeeRoles[n] === 'regular');
+     renderEmployeeList();
+     });
 
       // 💾 저장 버튼 이벤트 등록
       document.getElementById('saveAllBtn').addEventListener('click', () => {
@@ -851,6 +917,14 @@ async function saveNightShiftExceptions() {
   renderEmployeeList();
 });
 
+//설정> 각 탭 클릭시 중복화면없이 화면 전환
+function showSettingsSection(visibleId) {
+  ['employeeSettings', 'nightShiftSettings', 'excelUploadSection']
+    .forEach(id => {
+      document.getElementById(id).style.display =
+        (id === visibleId) ? 'block' : 'none';
+    });
+}
   
     //저장메세지
 function showToast(msg) {
@@ -882,16 +956,104 @@ function showToast(msg) {
   document.getElementById('btnExpenses').addEventListener('click', () => { showSection('expenses'); renderExpenseTable(); });
   document.getElementById('btnCharges').addEventListener('click', () => { showSection('charges'); renderChargeTable(); });
   document.getElementById('btnSettings').addEventListener('click', () => { showSection('settings'); });
-  document.getElementById('btnEmployees').addEventListener('click', () => { const es = document.getElementById('employeeSettings'); es.style.display = es.style.display==='none'?'block':'none'; });  document.getElementById('addEmployeeBtn').addEventListener('click', addEmployee); showSection('stats');
-  document.getElementById('btnNightShift').addEventListener('click', () => {
-    const ns = document.getElementById('nightShiftSettings');
-    ns.style.display = (ns.style.display === 'none' || !ns.style.display) ? 'block' : 'none';
-    if (ns.style.display === 'block') {
-      loadNightShiftData();    }  });
+  document.getElementById('btnEmployees').addEventListener('click', () => {    showSettingsSection('employeeSettings');  });
+  document.getElementById('btnNightShift').addEventListener('click', () => {    showSettingsSection('nightShiftSettings');    loadNightShiftData();  });
   document.getElementById('moveToRightBtn').addEventListener('click', () => moveSelected('leftNightList', 'rightNightList'));
   document.getElementById('moveToLeftBtn').addEventListener('click', () => moveSelected('rightNightList', 'leftNightList'));
   document.getElementById('saveNightShiftBtn').addEventListener('click', saveNightShiftExceptions);
+  document.getElementById('btnExcelUpload').addEventListener('click', () => {    showSettingsSection('excelUploadSection');  });
+  const fileInput = document.getElementById('fileInput');
+  fileInput.addEventListener('click', () => {
+    fileInput.value = '';
+    parsedData = null;
+    uploadFileName = '';
   });
+  fileInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    uploadFileName = file.name.toLowerCase();
+
+    if (!uploadFileName.endsWith('.csv')) {
+      logUpload("❌ CSV 파일만 선택 가능합니다.");
+      parsedData = null;
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.readAsText(file, 'euc-kr');
+    reader.onload = (evt) => {
+      const csvText = evt.target.result;
+      parsedData = parseCSV(csvText);
+      if (parsedData) {
+        logUpload(`✅ ${file.name} 파싱 완료 (행: ${parsedData.length})`);
+      } else {
+        logUpload("❌ CSV 파싱 중 오류");
+      }
+    };
+    reader.onerror = () => {
+      logUpload("❌ 파일 읽기 오류");
+      parsedData = null;
+    };
+  });
+  document.getElementById('uploadBtn').addEventListener('click', () => {
+    if (!parsedData) {
+      logUpload("⚠️ 먼저 CSV 파일을 선택해주세요.");
+      return;
+    }
+
+    let path = '';
+    if (uploadFileName.includes('leave'))       path = 'leave';
+    else if (uploadFileName.includes('night'))  path = 'nightShift';
+    else {
+      logUpload("⚠️ 파일명에 `leave` 또는 `night`가 포함되어야 합니다.");
+      return;
+    }
+
+    const obj = {};
+    parsedData.forEach(row => {
+      const name = row.이름 || row.name;
+      if (!name) return;
+      obj[name] = {};
+      Object.keys(row).forEach(k => {
+        if (k !== '이름' && k !== 'name') {
+          obj[name][k] = row[k];
+        }
+      });
+    });
+
+    db.ref(path).set(obj)
+      .then(() => {
+        logUpload(`🎉 "${path}" 경로에 업로드 완료!`);
+        parsedData = null;
+      })
+      .catch(err => {
+        logUpload("❌ 업로드 오류: " + err.message);
+      });
+  });
+  function parseCSV(text) {
+    
+    const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
+    if (lines.length < 2) return null;
+
+   
+    const headers = lines[0].split(',').map(h => h.trim());
+
+    const data = [];
+    for (let i = 1; i < lines.length; i++) {
+      const cells = lines[i].split(',');
+    
+      while (cells.length < headers.length) cells.push('');
+      const obj = {};
+      for (let j = 0; j < headers.length; j++) {
+        obj[headers[j]] = cells[j].trim();
+      }
+      data.push(obj);
+    }
+    return data;
+  }
+  function logUpload(msg) {
+    document.getElementById('uploadLog').textContent = msg;
+  }
+});
 
   </script>
 </body>
