@@ -190,10 +190,10 @@ async function getKoreanHolidays(y, m) {
         + `&solYear=${y}`
         + `&solMonth=${mm}`
         + `&numOfRows=31&pageNo=1&_type=json`;
-      console.log('🌐 Fetching holiday URL:', url);
+
       const res = await fetch(url);
       const text = await res.text();
-      console.log('📄 Raw holiday response:', text);
+
       try {
         const json = JSON.parse(text);
         const items = json.response.body.items?.item || [];
@@ -614,7 +614,6 @@ async function getSeasonalAverageByWeekday() {
       }
     }
   
-    console.log('📊 시즌별 평균 식사 인원:', result);
     return result;
   }
    
@@ -679,6 +678,7 @@ async function calculateSeasonalAverageForForecast(baseYear, baseMonth) {
     sumAvg[d] += (dynamicAvg[d] != null ? dynamicAvg[d] : 0);
   });
 
+
   // 6) 개월 수 계산 및 평균
   const totalMonths = histKeys.length + 1;  // histKeys.length가 0 이상임을 전제
   const result = Object.fromEntries(
@@ -696,7 +696,7 @@ async function calculateNextMonthEstimate(year, month) {
 
   const weekdayValues = await calculateSeasonalAverageForForecast(year, month);
 
-  // 5) 다음 달 평일 일수 세고 금액 계산
+  // 5) 다음 달 평일 일수 계산
   const daysInNext = new Date(nextYear, nextMonth, 0).getDate();
   const holidays   = await getKoreanHolidays(nextYear, nextMonth);
   const wk         = ['일','월','화','수','목','금','토'];
@@ -709,7 +709,8 @@ async function calculateNextMonthEstimate(year, month) {
       cnt[day]++;
     }
   }
-  
+
+
   // 4) 금액 계산 및 exprParts 생성
   const cost      = 4500;
   let estimated   = 0;
