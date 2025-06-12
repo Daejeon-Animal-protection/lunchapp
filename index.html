@@ -709,15 +709,6 @@ async function calculateNextMonthEstimate(year, month) {
       cnt[day]++;
     }
   }
-
-    console.group(`▶️ ${year}년 ${month}월 → ${nextYear}년 ${nextMonth}월 예상지출 계산`);
-  console.log('1) 히스토리컬+동적으로 재계산된 요일별 평균(combinedAvg):');
-  console.table(combinedAvg);
-  console.log('2) 기준달 동적 평균(dynamicAvg):');
-  console.table(dynamicAvg);
-  console.log('3) 다음 달 평일 일수(cnt):');
-  console.table(cnt);
-  console.groupEnd();
   
   // 4) 금액 계산 및 exprParts 생성
   const cost      = 4500;
