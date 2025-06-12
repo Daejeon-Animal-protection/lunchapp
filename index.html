@@ -85,8 +85,8 @@
     <h1>⚙️ 설정</h1>
     <div class="toggle-buttons">
       <button id="btnEmployees">👥 직원목록</button>
-      <button id="btnNightShift">🌙 야간조관리</button>
-      <button id="btnExcelUpload">📂 엑셀 업로드</button>
+      <button id="btnNightShift">🌙 야간조 식사여부 관리</button>
+      <button id="btnExcelUpload">📂 기간제근로자 근무표 업로드</button>
       </div>
      <div id="employeeSettings" style="display:none;">
       <input id="newEmployee" placeholder="직원이름 입력"/>
@@ -957,6 +957,7 @@ function showToast(msg) {
   document.getElementById('btnExpenses').addEventListener('click', () => { showSection('expenses'); renderExpenseTable(); });
   document.getElementById('btnCharges').addEventListener('click', async () => {  showSection('charges');  const tbody = document.getElementById('chargeTableBody');  if (tbody) tbody.innerHTML = '';    await renderChargeTable();  });
   document.getElementById('btnSettings').addEventListener('click', () => { showSection('settings'); });
+  document.getElementById('addEmployeeBtn').addEventListener('click', addEmployee);
   document.getElementById('btnEmployees').addEventListener('click', () => {    showSettingsSection('employeeSettings');  });
   document.getElementById('btnNightShift').addEventListener('click', () => {    showSettingsSection('nightShiftSettings');    loadNightShiftData();  });
   document.getElementById('moveToRightBtn').addEventListener('click', () => moveSelected('leftNightList', 'rightNightList'));
