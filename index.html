@@ -72,7 +72,7 @@
 
   <!-- 식대 징수 섹션 -->
   <div id="charges" class="section">
-    <label>📅 월 선택: <select id="monthSelectCharges" onchange="renderChargeTable()"></select></label>
+    <label>📅 월 선택:<select id="monthSelectCharges"></select></label>
     <h1>💰 식대 징수</h1>
     <table>
       <thead><tr><th>이름</th><th>식사횟수</th><th>기본 식비</th><th>추가 식비</th><th>총액</th></tr></thead>
@@ -283,10 +283,10 @@ async function renderStatsTable() {
 
 //식대징수 기능
 function renderChargeTable() {
+ 
   const sel   = document.getElementById('monthSelectCharges').value;
   const tbody = document.getElementById('chargeTableBody');
   tbody.innerHTML = '';
-
   // ← Promise를 반환하도록 return 추가!
   return db.ref('mealLogs').once('value').then(snapshot => {
     const data = snapshot.val() || {};
@@ -954,7 +954,7 @@ function showToast(msg) {
   document.getElementById('monthSelectCharges')?.addEventListener('change', renderChargeTable);
   document.getElementById('btnStats').addEventListener('click', () => { showSection('stats'); renderStatsTable(); });
   document.getElementById('btnExpenses').addEventListener('click', () => { showSection('expenses'); renderExpenseTable(); });
-  document.getElementById('btnCharges').addEventListener('click', () => { showSection('charges'); renderChargeTable(); });
+  document.getElementById('btnCharges').addEventListener('click', async () => {  showSection('charges');  const tbody = document.getElementById('chargeTableBody');  if (tbody) tbody.innerHTML = '';    await renderChargeTable();  });
   document.getElementById('btnSettings').addEventListener('click', () => { showSection('settings'); });
   document.getElementById('btnEmployees').addEventListener('click', () => {    showSettingsSection('employeeSettings');  });
   document.getElementById('btnNightShift').addEventListener('click', () => {    showSettingsSection('nightShiftSettings');    loadNightShiftData();  });
