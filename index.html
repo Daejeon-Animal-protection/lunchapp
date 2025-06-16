@@ -282,12 +282,17 @@ async function renderStatsTable() {
 }
 
 //식대징수 기능
+let hireDatesMap = {};
+db.ref('hireDates').once('value').then(snap => {
+  hireDatesMap = snap.val() || {};
+});
+
 function renderChargeTable() {
- 
   const sel   = document.getElementById('monthSelectCharges').value;
   const tbody = document.getElementById('chargeTableBody');
+  const monthStart = sel + '-01';
   tbody.innerHTML = '';
-  // ← Promise를 반환하도록 return 추가!
+ 
   return db.ref('mealLogs').once('value').then(snapshot => {
     const data = snapshot.val() || {};
     let sumTotal = 0;
@@ -305,14 +310,14 @@ function renderChargeTable() {
         : employees.filter(n => !regularList.includes(n));
 
       list.forEach(name => {
-        const cnt   = Object.entries(data[name] || {})
-                          .filter(([d,v]) => d.startsWith(sel) && v === 'O')
-                          .length;
+        const cnt   = Object.entries(data[name] || {}).filter(([d,v]) => d.startsWith(sel) && v === 'O').length;
         const basic = 50000;
-        const extra = Math.max(0, cnt - 10) * 5000;
+        const hireDate  = hireDatesMap[name]; 
+        const threshold = (hireDate>monthStart) ? 0 : 10;
+        const extra     = Math.max(0, cnt-threshold) * 5000;
         const total = basic + extra;
-
-        groupSum += total;
+         
+         groupSum += total;
         sumTotal  += total;
 
         const row = document.createElement('tr');
@@ -462,7 +467,13 @@ function addEmployee() {
     if (name && !employees.includes(name)) {
       employees.push(name);
       regularList.push(name);
+      const today = new Date().toISOString().slice(0,10);
+      db.ref('hireDates/' + name).set(today).then(() => {
+           hireDatesMap[name] = todayStr;
+           renderChargeTable();
+           });
       db.ref('employees').set(employees);
+      db.ref('employeeRoles/' + name).set('regular');
       input.value = '';
       renderEmployeeList();
     }
