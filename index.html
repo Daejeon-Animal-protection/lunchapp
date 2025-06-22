@@ -810,11 +810,10 @@ let parsedData = null;
 let uploadFileName = '';
 
 async function uploadToFirebase() {
-  // 1) parsedData 검사
   if (!parsedData || !Array.isArray(parsedData)) {
     return logUpload("⚠️ 먼저 올바른 파일을 선택해주세요.");
   }
-  // 2) fileName 검사
+
   if (typeof uploadFileName !== 'string') {
     return logUpload("⚠️ 파일명이 유효하지 않습니다.");
   }
@@ -827,30 +826,33 @@ async function uploadToFirebase() {
     return logUpload('⚠️ 파일명에 "leave" 또는 "night"를 포함해야 합니다.');
   }
 
-  // 3) 객체 생성
   const obj = {};
+
   parsedData.forEach(row => {
     const rawName = row.이름 || row.name;
-    if (!rawName) return;
-    const name = String(rawName).trim();
-    if (!obj[name]) obj[name] = {};
+    const rawDate = row.날짜 || row.date;
+    if (!rawName || !rawDate) return;
 
-    Object.entries(row).forEach(([k, v]) => {
-    if (k === '이름' || k === 'name') return;
-    if (v && v.trim() !== '') {
-      obj[name][k] = true; 
+    const name = String(rawName).trim();
+    const date = String(rawDate).trim();
+
+    if (!obj[name]) obj[name] = [];
+    if (!obj[name].includes(date)) {
+      obj[name].push(date);
     }
-    });
   });
 
   try {
-    await  db.ref(path).set(obj);
-      logUpload(`🎉 "${path}" 업로드 완료`);
-       fileInput.value = '';
-      parsedData = null;
-      uploadFileName = '';
-    }    catch(err) {logUpload(`❌ 업로드 실패: ${err.message}`);
-}}
+    await db.ref(path).set(obj);
+    logUpload(`🎉 "${path}" 업로드 완료`);
+    fileInput.value = '';
+    parsedData = null;
+    uploadFileName = '';
+  } catch(err) {
+    logUpload(`❌ 업로드 실패: ${err.message}`);
+  }
+}
+
 
 
 function logUpload(msg) {
@@ -1009,41 +1011,7 @@ function showToast(msg) {
       parsedData = null;
     };
   });
-  document.getElementById('uploadBtn').addEventListener('click', () => {
-    if (!parsedData) {
-      logUpload("⚠️ 먼저 CSV 파일을 선택해주세요.");
-      return;
-    }
-
-    let path = '';
-    if (uploadFileName.includes('leave'))       path = 'leave';
-    else if (uploadFileName.includes('night'))  path = 'nightShift';
-    else {
-      logUpload("⚠️ 파일명에 `leave` 또는 `night`가 포함되어야 합니다.");
-      return;
-    }
-
-    const obj = {};
-    parsedData.forEach(row => {
-      const name = row.이름 || row.name;
-      if (!name) return;
-      obj[name] = {};
-      Object.keys(row).forEach(k => {
-        if (k !== '이름' && k !== 'name') {
-          obj[name][k] = row[k];
-        }
-      });
-    });
-
-    db.ref(path).set(obj)
-      .then(() => {
-        logUpload(`🎉 "${path}" 경로에 업로드 완료!`);
-        parsedData = null;
-      })
-      .catch(err => {
-        logUpload("❌ 업로드 오류: " + err.message);
-      });
-  });
+  document.getElementById('uploadBtn').addEventListener('click', uploadToFirebase);
   function parseCSV(text) {
     
     const lines = text.split(/\r\n|\n/).filter(line => line.trim() !== '');
