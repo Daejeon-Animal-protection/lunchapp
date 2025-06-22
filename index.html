@@ -836,8 +836,10 @@ async function uploadToFirebase() {
     if (!obj[name]) obj[name] = {};
 
     Object.entries(row).forEach(([k, v]) => {
-      if ((k === '이름' || k === 'name') || v == null) return;
-      obj[name][k] = v;
+    if (k === '이름' || k === 'name') return;
+    if (v && v.trim() !== '') {
+      obj[name][k] = true; 
+    }
     });
   });
 
