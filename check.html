@@ -294,9 +294,9 @@ async function renderDates(name, month) {
     // 5) 렌더링
     cont.innerHTML = '';
     days.forEach(date => { 
-      if (contractList.includes(name) && new Date(date).getDay() === 1)     values[date] = 'X';
-      if (Array.isArray(leaveDatesMap[name]) &&        leaveDatesMap[name].includes(date)) {      values[date] = 'X';    }
-      if (nightShiftExceptions.includes(name) &&        Array.isArray(nightShiftMap[name]) &&        nightShiftMap[name].includes(date)) {      values[date] = 'X';    }
+      if (    contractList.includes(name) &&    new Date(date).getDay() === 1 &&    values[date] === undefined  ) {    values[date] = 'X';  }
+      if ( Array.isArray(leaveDatesMap[name]) &&    leaveDatesMap[name].includes(date) &&    values[date] === undefined  ) {    values[date] = 'X';  }
+      if (    nightShiftExceptions.includes(name) &&    Array.isArray(nightShiftMap[name]) &&    nightShiftMap[name].includes(date) &&    values[date] === undefined  ) {    values[date] = 'X';  }
       if (new Date(date) < new Date(todayISO) && values[date] === undefined) values[date] = 'X';
       const row = document.createElement('div');
       row.className = 'date-row';
